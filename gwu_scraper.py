@@ -269,20 +269,53 @@ class CourseScraper:
         print(f"✓ Saved raw data to: {filename}")
 
 
-def generate_html_calendar(courses: List[Dict], output_file: str):
+def generate_html_calendar(courses: List[Dict], output_file: str, year: str = None, semester: str = None):
     """Generate interactive HTML calendar"""
-    
+
     courses_json = json.dumps(courses, ensure_ascii=False)
-    
+
+    # Generate dynamic title
+    semester_map = {
+        '01': 'Spring',
+        '02': 'Summer',
+        '03': 'Fall'
+    }
+
+    if year and semester:
+        semester_name = semester_map.get(semester, 'Unknown')
+        title = f"GWU Courses - {semester_name} {year}"
+    else:
+        title = "GWU Courses"
+
     html_template = f'''<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GWU Courses - Spring 2026</title>
+    <title>{title}</title>
     <style>
         * {{ margin: 0; padding: 0; box-sizing: border-box; }}
-        body {{ font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8f9fa; padding: 20px; }}
+        body {{ font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8f9fa; padding: 0; }}
+        .main-content {{ padding: 20px; }}
+
+        /* Read the Docs style navigation */
+        .rtd-navbar {{ background-color: #2980b9; color: white; padding: 0 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); position: sticky; top: 0; z-index: 1000; }}
+        .rtd-navbar-content {{ display: flex; justify-content: space-between; align-items: center; max-width: 1400px; margin: 0 auto; height: 50px; }}
+        .rtd-navbar-left {{ display: flex; align-items: center; gap: 20px; }}
+        .rtd-navbar-title {{ font-size: 18px; font-weight: 600; color: white; text-decoration: none; display: flex; align-items: center; gap: 8px; }}
+        .rtd-navbar-right {{ display: flex; align-items: center; gap: 15px; }}
+        .rtd-nav-link {{ color: rgba(255,255,255,0.9); text-decoration: none; font-size: 14px; font-weight: 500; padding: 8px 14px; border-radius: 5px; transition: all 0.2s; display: flex; align-items: center; gap: 6px; }}
+        .rtd-nav-link:hover {{ background-color: rgba(255,255,255,0.15); color: white; }}
+        .github-icon {{ width: 20px; height: 20px; fill: currentColor; }}
+
+        /* Footer */
+        .rtd-footer {{ background-color: #343131; color: #d9d9d9; padding: 30px 20px; margin-top: 40px; border-top: 4px solid #2980b9; }}
+        .rtd-footer-content {{ max-width: 1400px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px; }}
+        .rtd-footer-left {{ font-size: 13px; }}
+        .rtd-footer-links {{ display: flex; gap: 20px; }}
+        .rtd-footer-link {{ color: #2980b9; text-decoration: none; font-size: 14px; font-weight: 500; display: flex; align-items: center; gap: 6px; transition: all 0.2s; }}
+        .rtd-footer-link:hover {{ color: #5dade2; }}
+        .rtd-footer-attribution {{ margin-top: 15px; padding-top: 15px; border-top: 1px solid #4a4a4a; text-align: center; font-size: 12px; color: #999; }}
         .header {{ background: linear-gradient(135deg, #1a73e8 0%, #4285f4 100%); color: white; padding: 30px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 12px rgba(26,115,232,0.3); }}
         .header h1 {{ font-size: 30px; margin-bottom: 10px; font-weight: 700; letter-spacing: -0.5px; }}
         .header p {{ font-size: 14px; opacity: 0.92; font-weight: 400; }}
@@ -401,10 +434,31 @@ def generate_html_calendar(courses: List[Dict], output_file: str):
     </style>
 </head>
 <body>
-    <div class="header">
-        <h1>🗓️ GWU Courses - Spring 2026</h1>
-        <p>Interactive Course Schedule | Scraped from GWU website on {datetime.now().strftime("%B %d, %Y")}</p>
-    </div>
+    <!-- Read the Docs style navigation -->
+    <nav class="rtd-navbar">
+        <div class="rtd-navbar-content">
+            <div class="rtd-navbar-left">
+                <span class="rtd-navbar-title">🎓 GWU Course Calendar</span>
+            </div>
+            <div class="rtd-navbar-right">
+                <a href="https://github.com/mmann1123/GWU_Course_Calendar" target="_blank" class="rtd-nav-link">
+                    <svg class="github-icon" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
+                    </svg>
+                    GitHub
+                </a>
+                <a href="https://github.com/mmann1123/GWU_Course_Calendar/issues" target="_blank" class="rtd-nav-link">
+                    Report Issue
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="main-content">
+        <div class="header">
+            <h1>🗓️ {title}</h1>
+            <p>Interactive Course Schedule | Scraped from GWU website on {datetime.now().strftime("%B %d, %Y")}</p>
+        </div>
 
     <div class="stats">
         <div class="stats-item"><span class="stats-number" id="totalCourses">0</span><span>Total Courses</span></div>
@@ -1071,12 +1125,59 @@ def generate_html_calendar(courses: List[Dict], output_file: str):
             const conflicts = detectRoomConflicts();
             const container = document.getElementById('conflictsContent');
 
+            // Find courses with unspecified rooms
+            const unspecifiedRooms = courses.filter(c =>
+                c.room.toLowerCase().includes('not specified') ||
+                c.room.toLowerCase().includes('tbd') ||
+                c.room.toLowerCase().includes('tba') ||
+                c.room.trim() === ''
+            );
+
+            let html = '';
+
+            // Display unspecified rooms section
+            if (unspecifiedRooms.length > 0) {{
+                html += `<div style="margin-bottom: 25px; padding: 18px; background-color: #e3f2fd; border-left: 4px solid #2980b9; border-radius: 8px;">
+                    <strong>📋 Found ${{unspecifiedRooms.length}} course${{unspecifiedRooms.length > 1 ? 's' : ''}} with unspecified rooms</strong>
+                    <p style="margin-top: 8px; color: #5f6368; font-size: 14px;">The following courses do not have room assignments:</p>
+                </div>`;
+
+                html += `<div style="margin-bottom: 30px; padding: 20px; background-color: #f8f9fa; border-radius: 8px; border-left: 4px solid #2980b9;">
+                    <div style="font-size: 16px; font-weight: 700; color: #202124; margin-bottom: 15px; display: flex; align-items: center; gap: 10px;">
+                        <span>📍 Unspecified Rooms</span>
+                        <span style="display: inline-block; padding: 3px 10px; background-color: #2980b9; color: white; border-radius: 12px; font-size: 11px; font-weight: 700;">${{unspecifiedRooms.length}} COURSES</span>
+                    </div>
+                    <div style="display: grid; gap: 12px;">`;
+
+                unspecifiedRooms.forEach(course => {{
+                    const daysExpanded = expandDays(course.days);
+                    html += `<div style="padding: 12px 15px; background-color: white; border-radius: 6px; border-left: 3px solid #2980b9;">
+                        <div style="font-weight: 600; color: #202124; margin-bottom: 5px;">${{course.course_number}} - ${{course.title}}</div>
+                        <div style="font-size: 13px; color: #5f6368;">
+                            <strong>CRN:</strong> ${{course.crn}} |
+                            <strong>Instructor:</strong> ${{course.instructor}}<br>
+                            <strong>Time:</strong> ${{course.time.raw}} |
+                            <strong>Days:</strong> ${{daysExpanded}} |
+                            <strong>Room:</strong> ${{course.room}}
+                        </div>
+                    </div>`;
+                }});
+
+                html += `</div></div>`;
+            }}
+
+            // Display room conflicts
             if (conflicts.length === 0) {{
-                container.innerHTML = '<div class="no-conflicts">✅ No room conflicts detected! All courses are scheduled without overlap.</div>';
+                if (unspecifiedRooms.length === 0) {{
+                    html = '<div class="no-conflicts">✅ No room conflicts detected! All courses are scheduled without overlap.</div>';
+                }} else {{
+                    html += '<div class="no-conflicts">✅ No room conflicts detected for assigned rooms.</div>';
+                }}
+                container.innerHTML = html;
                 return;
             }}
 
-            let html = `<div style="margin-bottom: 20px; padding: 15px; background-color: #fff3cd; border-left: 4px solid #ff6b6b; border-radius: 6px;">
+            html += `<div style="margin-bottom: 20px; padding: 15px; background-color: #fff3cd; border-left: 4px solid #ff6b6b; border-radius: 6px;">
                 <strong>⚠️ Found ${{conflicts.length}} room conflict${{conflicts.length > 1 ? 's' : ''}}</strong>
                 <p style="margin-top: 8px; color: #5f6368; font-size: 14px;">The following rooms have multiple courses scheduled at overlapping times:</p>
             </div>`;
@@ -1182,6 +1283,35 @@ def generate_html_calendar(courses: List[Dict], output_file: str):
         populateInstructorList();
         updateInstructorLegend();
     </script>
+    </div> <!-- end main-content -->
+
+    <!-- Read the Docs style footer -->
+    <footer class="rtd-footer">
+        <div class="rtd-footer-content">
+            <div class="rtd-footer-left">
+                <strong>GWU Course Calendar Scraper</strong><br>
+                Interactive course schedule viewer for George Washington University
+            </div>
+            <div class="rtd-footer-links">
+                <a href="https://github.com/mmann1123/GWU_Course_Calendar" target="_blank" class="rtd-footer-link">
+                    <svg class="github-icon" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
+                        <path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
+                    </svg>
+                    View on GitHub
+                </a>
+                <a href="https://github.com/mmann1123/GWU_Course_Calendar/issues" target="_blank" class="rtd-footer-link">
+                    <svg class="github-icon" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
+                        <path fill="currentColor" d="M8 1.5a6.5 6.5 0 100 13 6.5 6.5 0 000-13zM0 8a8 8 0 1116 0A8 8 0 010 8zm9 3a1 1 0 11-2 0 1 1 0 012 0zM6.92 6.085c.081-.16.19-.299.34-.398.145-.097.371-.187.74-.187.28 0 .553.087.738.225A.613.613 0 019 6.25c0 .177-.04.264-.077.318a.956.956 0 01-.277.245c-.076.051-.158.1-.258.161l-.007.004a7.728 7.728 0 00-.313.195 2.416 2.416 0 00-.692.661.75.75 0 001.248.832.956.956 0 01.276-.245 6.3 6.3 0 01.26-.16l.006-.004c.093-.057.204-.123.313-.195.222-.149.487-.355.692-.662.214-.32.329-.702.329-1.15 0-.76-.36-1.348-.863-1.725A2.76 2.76 0 008 4c-.631 0-1.155.16-1.572.438-.413.276-.68.638-.849.977a.75.75 0 001.342.67z"/>
+                    </svg>
+                    Report Issue
+                </a>
+            </div>
+        </div>
+        <div class="rtd-footer-attribution">
+            Credit: Michael Mann, Dept of Geography & Environment<br>
+            Scraped on {datetime.now().strftime("%B %d, %Y at %I:%M %p")} | Built with Python & BeautifulSoup
+        </div>
+    </footer>
 </body>
 </html>'''
     
@@ -1229,8 +1359,19 @@ def main():
         
         print()
         scraper.save_to_json(args.json)
-        generate_html_calendar(courses, args.output)
-        
+
+        # Extract year and semester from URL if available
+        year = None
+        semester = None
+        if args.url and 'termId=' in args.url:
+            import re
+            term_match = re.search(r'termId=(\d{4})(\d{2})', args.url)
+            if term_match:
+                year = term_match.group(1)
+                semester = term_match.group(2)
+
+        generate_html_calendar(courses, args.output, year=year, semester=semester)
+
         print("\n" + "="*70)
         print("✅ SUCCESS!")
         print(f"   📊 {len(courses)} courses")

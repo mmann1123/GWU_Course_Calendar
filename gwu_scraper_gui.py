@@ -45,13 +45,14 @@ class ScraperGUI:
 
         # Year Selection
         ttk.Label(main_frame, text="Year:", font=('Arial', 10)).grid(row=1, column=0, sticky=tk.W, pady=5)
-        self.year_var = tk.StringVar()
-        current_year = datetime.now().year
-        years = [str(year) for year in range(current_year - 1, current_year + 3)]
-        self.year_combo = ttk.Combobox(main_frame, textvariable=self.year_var,
-                                       values=years, width=20, state='readonly')
-        self.year_combo.set(str(current_year))
-        self.year_combo.grid(row=1, column=1, sticky=(tk.W, tk.E), pady=5, padx=(0, 10))
+        self.year_var = tk.StringVar(value="2026")
+        self.year_entry = ttk.Entry(main_frame, textvariable=self.year_var, width=20)
+        self.year_entry.grid(row=1, column=1, sticky=(tk.W, tk.E), pady=5, padx=(0, 10))
+
+        # Year hint
+        year_hint = ttk.Label(main_frame, text="(4-digit year, e.g., 2026)",
+                             font=('Arial', 8), foreground='gray')
+        year_hint.grid(row=1, column=2, sticky=tk.W, padx=(5, 0))
 
         # Semester Selection
         ttk.Label(main_frame, text="Semester:", font=('Arial', 10)).grid(row=2, column=0, sticky=tk.W, pady=5)
@@ -98,6 +99,11 @@ class ScraperGUI:
                                         command=self.cancel_scraping, state='disabled')
         self.cancel_button.grid(row=0, column=1, padx=5)
 
+        # Report Issue Button
+        self.report_button = ttk.Button(button_frame, text="Report Issue",
+                                        command=self.open_github_issues)
+        self.report_button.grid(row=0, column=2, padx=5)
+
         # Progress Label
         self.progress_label = ttk.Label(main_frame, text="", font=('Arial', 10))
         self.progress_label.grid(row=7, column=0, columnspan=3, pady=(0, 10))
@@ -133,9 +139,19 @@ class ScraperGUI:
 
     def build_url(self):
         """Build the GWU course URL from user inputs"""
-        year = self.year_var.get()
+        year = self.year_var.get().strip()
         semester_code = self.get_semester_code()
         subject = self.subject_var.get().upper().strip()
+
+        # Validate year
+        if not year:
+            raise ValueError("Year is required")
+        if not year.isdigit() or len(year) != 4:
+            raise ValueError("Year must be a 4-digit number (e.g., 2026)")
+
+        year_int = int(year)
+        if year_int < 2000 or year_int > 2099:
+            raise ValueError("Year must be between 2000 and 2099")
 
         if not subject:
             raise ValueError("Subject code is required")
@@ -215,7 +231,10 @@ class ScraperGUI:
             scraper.save_to_json(output_json)
             self.log(f"\n✓ Saved raw data to: {output_json}")
 
-            generate_html_calendar(courses, output_html)
+            # Get year and semester for HTML title
+            year = self.year_var.get().strip()
+            semester_code = self.get_semester_code()
+            generate_html_calendar(courses, output_html, year=year, semester=semester_code)
             self.log(f"✓ Calendar saved to: {output_html}")
 
             # Success
@@ -252,6 +271,11 @@ class ScraperGUI:
         import webbrowser
         filepath = os.path.abspath(filename)
         webbrowser.open('file://' + filepath)
+
+    def open_github_issues(self):
+        """Open GitHub issues page in default browser"""
+        import webbrowser
+        webbrowser.open('https://github.com/mmann1123/GWU_Course_Calendar/issues')
 
 
 def main():

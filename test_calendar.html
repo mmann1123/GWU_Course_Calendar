@@ -1107,19 +1107,11 @@
             </div>`;
 
             conflicts.forEach((conflict, index) => {
-                // Generate conflict signature for persistence
-                const crns = conflict.courses.map(c => c.crn).sort().join('-');
-                const conflictSig = `${conflict.room}_${conflict.courses[0].days}_${conflict.courses[0].time.start}_${crns}`;
-                const isIgnored = ignoredConflicts.has(conflictSig);
-
-                html += `<div class="conflict-group${isIgnored ? ' conflict-hidden' : ''}" id="conflict-${index}" data-signature="${conflictSig}">
-                    <button class="conflict-ignore-btn" onclick="toggleIgnoreConflict('${conflictSig}', ${index})">
-                        ${isIgnored ? '↶ Show' : '✕ Ignore'}
-                    </button>
+                html += `<div class="conflict-group" id="conflict-${index}">
+                    <button class="conflict-ignore-btn" onclick="ignoreConflict(${index})">✕ Ignore</button>
                     <div class="conflict-header">
                         <span>📍 ${conflict.room}</span>
                         <span class="conflict-severity">${conflict.courses.length} COURSES</span>
-                        ${isIgnored ? '<span style="margin-left: 10px; font-size: 12px; color: #666;">(Previously Ignored)</span>' : ''}
                     </div>
                     <p style="color: #721c24; font-size: 13px; margin: 10px 0;">These courses are scheduled in the same room at overlapping times:</p>
                     <div class="conflict-courses">`;
@@ -1140,50 +1132,14 @@
                 html += `</div></div>`;
             });
 
-            // Add reset button if there are ignored conflicts
-            if (ignoredConflicts.size > 0) {
-                html += `<div style="margin-top: 20px; text-align: center;">
-                    <button class="edit-action-btn btn-secondary" onclick="resetIgnoredConflicts()">
-                        ↶ Reset All Ignored Conflicts (${ignoredConflicts.size})
-                    </button>
-                </div>`;
-            }
-
             container.innerHTML = html;
         }
 
-        // Toggle ignore conflict (with localStorage persistence)
-        function toggleIgnoreConflict(signature, index) {
-            const conflictElement = document.getElementById(`conflict-${index}`);
-            if (!conflictElement) return;
-
-            if (ignoredConflicts.has(signature)) {
-                // Un-ignore
-                ignoredConflicts.delete(signature);
-                conflictElement.classList.remove('conflict-hidden');
-            } else {
-                // Ignore
-                ignoredConflicts.add(signature);
+        function ignoreConflict(conflictIndex) {
+            const conflictElement = document.getElementById(`conflict-${conflictIndex}`);
+            if (conflictElement) {
                 conflictElement.classList.add('conflict-hidden');
             }
-
-            // Persist to localStorage
-            localStorage.setItem('ignoredConflicts', JSON.stringify([...ignoredConflicts]));
-
-            // Refresh the display to update button and counter
-            detectAndDisplayRoomConflicts();
-        }
-
-        // Reset all ignored conflicts
-        function resetIgnoredConflicts() {
-            if (!confirm('Are you sure you want to reset all ignored conflicts? This will show all conflicts again.')) {
-                return;
-            }
-
-            ignoredConflicts.clear();
-            localStorage.removeItem('ignoredConflicts');
-            detectAndDisplayRoomConflicts();
-            showToast('↶ All ignored conflicts have been reset', 'info');
         }
 
         // Class list - show instructor schedules
@@ -1779,7 +1735,7 @@
         </div>
         <div class="rtd-footer-attribution">
             Credit: Michael Mann, Dept of Geography & Environment<br>
-            Scraped on October 22, 2025 at 11:02 AM | Built with Python & BeautifulSoup
+            Scraped on October 22, 2025 at 10:59 AM | Built with Python & BeautifulSoup
         </div>
     </footer>
 </body>

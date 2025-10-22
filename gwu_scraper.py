@@ -535,7 +535,7 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
         <button class="tab-btn" data-tab="edit-schedule" onclick="switchTab('edit-schedule')">✏️ Edit Schedule</button>
     </div>
 
-    <div class="filter-controls">
+    <div class="filter-controls" id="mainCalendarFilters">
         <span class="filter-text">View:</span>
         <button class="filter-btn" onclick="showAllDays()">Show All Days</button>
         <span class="filter-text">|</span>
@@ -607,6 +607,31 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
                 <span class="edit-status" id="editStatus">
                     <span id="editCount">0</span> unsaved changes
                 </span>
+            </div>
+
+            <!-- Edit Mode Filters -->
+            <div class="filter-controls" style="margin: 20px 0;">
+                <span class="filter-text">Room:</span>
+                <select id="editRoomFilter" onchange="applyEditFilters()" style="padding: 6px 12px; border: 1px solid #dadce0; border-radius: 4px; font-size: 14px; cursor: pointer; background-color: white;">
+                    <option value="all">All Rooms</option>
+                </select>
+                <span class="filter-text">|</span>
+                <span class="filter-text">Instructors:</span>
+                <div class="instructor-selector-wrapper">
+                    <button class="filter-btn" id="editInstructorDropdownBtn" onclick="toggleEditInstructorDropdown()">
+                        <span id="editInstructorBtnText">All Instructors</span> ▼
+                    </button>
+                    <div class="instructor-dropdown" id="editInstructorDropdown">
+                        <div class="instructor-dropdown-header">
+                            <button class="dropdown-action-btn" onclick="selectAllEditInstructors()">Select All</button>
+                            <button class="dropdown-action-btn" onclick="clearAllEditInstructors()">Clear All</button>
+                        </div>
+                        <div id="editInstructorList" class="instructor-list"></div>
+                    </div>
+                </div>
+                <div id="editFilterStatus" style="color: #5f6368; font-size: 14px; margin-left: 15px;">
+
+                </div>
             </div>
 
             <div class="calendar-container edit-mode">
@@ -799,6 +824,8 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
         let ignoredConflicts = new Set(JSON.parse(localStorage.getItem('ignoredConflicts') || '[]'));
         let editIgnoredConflicts = new Set(JSON.parse(localStorage.getItem('editIgnoredConflicts') || '[]'));
         let currentEditCRN = null;
+        let editSelectedInstructors = new Set();
+        let editRoomFilter = 'all';
 
         // Generate unique color for each instructor using HSL
         function generateInstructorColors() {{
@@ -834,6 +861,12 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
                 content.style.display = 'none';
             }});
             document.getElementById(tabName + '-tab').style.display = 'block';
+
+            // Show/hide main calendar filters (hide in edit mode, show otherwise)
+            const mainFilters = document.getElementById('mainCalendarFilters');
+            if (mainFilters) {{
+                mainFilters.style.display = tabName === 'edit-schedule' ? 'none' : 'flex';
+            }}
 
             // Load tab-specific content
             if (tabName === 'planning-mode') {{
@@ -1572,6 +1605,8 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
         function initializeEditMode() {{
             populateTimePickers();
             populateInstructorDatalist();
+            populateEditInstructorFilter();
+            populateEditRoomFilter();
             renderEditCalendar();
             displayEditModeConflicts();
             updateEditCount();
@@ -1581,6 +1616,155 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
                 checkbox.addEventListener('change', syncDayCheckboxes);
             }});
         }}
+
+        // Populate instructor checkboxes in edit mode
+        function populateEditInstructorFilter() {{
+            const instructorList = document.getElementById('editInstructorList');
+            instructorList.innerHTML = ''; // Clear existing
+            const instructors = [...new Set(editedCourses.map(c => c.instructor))].sort();
+
+            // Ensure all instructors have colors
+            instructors.forEach(instructor => {{
+                if (!instructorColors[instructor]) {{
+                    // Generate a color if missing
+                    const hue = Math.floor(Math.random() * 360);
+                    instructorColors[instructor] = `hsl(${{hue}}, 70%, 60%)`;
+                }}
+            }});
+
+            instructors.forEach(instructor => {{
+                const item = document.createElement('div');
+                item.className = 'instructor-checkbox-item';
+
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.id = `edit-instructor-${{instructor.replace(/\\s+/g, '-')}}`;
+                checkbox.value = instructor;
+                checkbox.checked = editSelectedInstructors.size === 0 || editSelectedInstructors.has(instructor);
+                checkbox.onchange = () => toggleEditInstructorSelection(instructor);
+
+                const label = document.createElement('label');
+                label.setAttribute('for', checkbox.id);
+
+                const colorIndicator = document.createElement('span');
+                colorIndicator.className = 'instructor-color-indicator';
+                colorIndicator.style.backgroundColor = getInstructorColor(instructor);
+
+                label.appendChild(colorIndicator);
+                label.appendChild(document.createTextNode(instructor));
+
+                item.appendChild(checkbox);
+                item.appendChild(label);
+                instructorList.appendChild(item);
+            }});
+        }}
+
+        // Populate room filter dropdown in edit mode
+        function populateEditRoomFilter() {{
+            const roomSelect = document.getElementById('editRoomFilter');
+            const rooms = [...new Set(editedCourses.map(c => `${{c.building}} ${{c.room}}`))].sort();
+
+            roomSelect.innerHTML = '<option value="all">All Rooms</option>';
+            rooms.forEach(room => {{
+                if (room.includes('Not specified')) return; // Skip unspecified rooms
+                const option = document.createElement('option');
+                option.value = room;
+                option.textContent = room;
+                roomSelect.appendChild(option);
+            }});
+        }}
+
+        // Toggle instructor dropdown in edit mode
+        function toggleEditInstructorDropdown() {{
+            const dropdown = document.getElementById('editInstructorDropdown');
+            dropdown.style.display = dropdown.style.display === 'block' ? 'none' : 'block';
+        }}
+
+        // Toggle single instructor selection in edit mode
+        function toggleEditInstructorSelection(instructor) {{
+            if (editSelectedInstructors.has(instructor)) {{
+                editSelectedInstructors.delete(instructor);
+            }} else {{
+                editSelectedInstructors.add(instructor);
+            }}
+            updateEditInstructorButtonText();
+            applyEditFilters();
+        }}
+
+        // Select all instructors in edit mode
+        function selectAllEditInstructors() {{
+            editSelectedInstructors.clear();
+            document.querySelectorAll('#editInstructorList input[type="checkbox"]').forEach(cb => {{
+                cb.checked = true;
+            }});
+            updateEditInstructorButtonText();
+            applyEditFilters();
+        }}
+
+        // Clear all instructors in edit mode
+        function clearAllEditInstructors() {{
+            editSelectedInstructors.clear();
+            document.querySelectorAll('#editInstructorList input[type="checkbox"]').forEach(cb => {{
+                cb.checked = false;
+                editSelectedInstructors.add(cb.value);
+            }});
+            // Start with one instructor selected
+            const firstCheckbox = document.querySelector('#editInstructorList input[type="checkbox"]');
+            if (firstCheckbox) {{
+                firstCheckbox.checked = true;
+                editSelectedInstructors.clear();
+                editSelectedInstructors.add(firstCheckbox.value);
+            }}
+            updateEditInstructorButtonText();
+            applyEditFilters();
+        }}
+
+        // Update instructor button text in edit mode
+        function updateEditInstructorButtonText() {{
+            const btnText = document.getElementById('editInstructorBtnText');
+            if (editSelectedInstructors.size === 0) {{
+                btnText.textContent = 'All Instructors';
+            }} else if (editSelectedInstructors.size === 1) {{
+                btnText.textContent = Array.from(editSelectedInstructors)[0];
+            }} else {{
+                btnText.textContent = `${{editSelectedInstructors.size}} Instructors`;
+            }}
+        }}
+
+        // Apply edit mode filters
+        function applyEditFilters() {{
+            editRoomFilter = document.getElementById('editRoomFilter').value;
+
+            // Update status text
+            let statusParts = [];
+
+            if (editRoomFilter !== 'all') {{
+                statusParts.push(`Room: <strong>${{editRoomFilter}}</strong>`);
+            }}
+
+            if (editSelectedInstructors.size === 0) {{
+                statusParts.push('<strong>all instructors</strong>');
+            }} else if (editSelectedInstructors.size === 1) {{
+                statusParts.push(Array.from(editSelectedInstructors)[0]);
+            }} else {{
+                statusParts.push(`<strong>${{editSelectedInstructors.size}} instructors</strong>`);
+            }}
+
+            document.getElementById('editFilterStatus').innerHTML = statusParts.join(' | ');
+
+            // Re-render calendar with filters
+            renderEditCalendar();
+        }}
+
+        // Close dropdowns when clicking outside
+        document.addEventListener('click', function(event) {{
+            const editDropdown = document.getElementById('editInstructorDropdown');
+            const editDropdownBtn = document.getElementById('editInstructorDropdownBtn');
+
+            if (editDropdown && !editDropdownBtn.contains(event.target) && !editDropdown.contains(event.target)) {{
+                editDropdown.style.display = 'none';
+            }}
+        }});
 
         // Populate time picker dropdowns with 10-minute intervals
         function populateTimePickers() {{
@@ -1664,10 +1848,19 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
                 document.getElementById(`edit-${{day}}`).innerHTML = '';
             }});
 
-            // Group courses by day
+            // Group courses by day with filters applied
             const coursesByDay = {{ monday: [], tuesday: [], wednesday: [], thursday: [], friday: [] }};
             editedCourses.forEach(course => {{
                 if (!course.days || !course.time) return;
+
+                // Apply instructor filter
+                const instructorMatch = editSelectedInstructors.size === 0 || editSelectedInstructors.has(course.instructor);
+                if (!instructorMatch) return;
+
+                // Apply room filter
+                const courseRoom = `${{course.building}} ${{course.room}}`;
+                if (editRoomFilter !== 'all' && courseRoom !== editRoomFilter) return;
+
                 course.days.split('').forEach(dayLetter => {{
                     const dayName = dayMap[dayLetter];
                     if (dayName) coursesByDay[dayName].push(course);
@@ -2067,6 +2260,8 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
 
             editCount++;
             updateEditCount();
+            populateEditInstructorFilter();
+            populateEditRoomFilter();
             renderEditCalendar();
             displayEditModeConflicts();
             populateInstructorDatalist();
@@ -2089,6 +2284,8 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
                 editedCRNs.delete(crn);
                 editCount++;
                 updateEditCount();
+                populateEditInstructorFilter();
+                populateEditRoomFilter();
                 renderEditCalendar();
                 displayEditModeConflicts();
                 closeEditModal();
@@ -2120,6 +2317,8 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
             editedCRNs.add(newCRN);
             editCount++;
             updateEditCount();
+            populateEditInstructorFilter();
+            populateEditRoomFilter();
             renderEditCalendar();
             displayEditModeConflicts();
             closeEditModal();
@@ -2287,6 +2486,8 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
 
                     editCount += imported.length;
                     updateEditCount();
+                    populateEditInstructorFilter();
+                    populateEditRoomFilter();
                     renderEditCalendar();
                     displayEditModeConflicts();
                     populateInstructorDatalist();

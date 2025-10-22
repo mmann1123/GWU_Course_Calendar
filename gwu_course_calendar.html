@@ -234,7 +234,7 @@
         <button class="tab-btn" data-tab="edit-schedule" onclick="switchTab('edit-schedule')">✏️ Edit Schedule</button>
     </div>
 
-    <div class="filter-controls">
+    <div class="filter-controls" id="mainCalendarFilters">
         <span class="filter-text">View:</span>
         <button class="filter-btn" onclick="showAllDays()">Show All Days</button>
         <span class="filter-text">|</span>
@@ -306,6 +306,31 @@
                 <span class="edit-status" id="editStatus">
                     <span id="editCount">0</span> unsaved changes
                 </span>
+            </div>
+
+            <!-- Edit Mode Filters -->
+            <div class="filter-controls" style="margin: 20px 0;">
+                <span class="filter-text">Room:</span>
+                <select id="editRoomFilter" onchange="applyEditFilters()" style="padding: 6px 12px; border: 1px solid #dadce0; border-radius: 4px; font-size: 14px; cursor: pointer; background-color: white;">
+                    <option value="all">All Rooms</option>
+                </select>
+                <span class="filter-text">|</span>
+                <span class="filter-text">Instructors:</span>
+                <div class="instructor-selector-wrapper">
+                    <button class="filter-btn" id="editInstructorDropdownBtn" onclick="toggleEditInstructorDropdown()">
+                        <span id="editInstructorBtnText">All Instructors</span> ▼
+                    </button>
+                    <div class="instructor-dropdown" id="editInstructorDropdown">
+                        <div class="instructor-dropdown-header">
+                            <button class="dropdown-action-btn" onclick="selectAllEditInstructors()">Select All</button>
+                            <button class="dropdown-action-btn" onclick="clearAllEditInstructors()">Clear All</button>
+                        </div>
+                        <div id="editInstructorList" class="instructor-list"></div>
+                    </div>
+                </div>
+                <div id="editFilterStatus" style="color: #5f6368; font-size: 14px; margin-left: 15px;">
+
+                </div>
             </div>
 
             <div class="calendar-container edit-mode">
@@ -483,7 +508,7 @@
     </div>
 
     <script>
-        const courses = [{"status": "OPEN", "crn": "46234", "subject": "GEOG", "course_num": "1001", "section": "10", "title": "Introduction to Human Geography", "credits": "3.00", "instructor": "Chacko, E", "days": "TR", "time": {"start": "02:20PM", "end": "03:35PM", "raw": "02:20PM - 03:35PM"}, "dates": "01/12/26 - 04/27/26", "building": "1957 E", "room": "B12", "course_number": "GEOG 1001"}, {"status": "OPEN", "crn": "43145", "subject": "GEOG", "course_num": "1002", "section": "10", "title": "Introduction to Physical Geography", "credits": "4.00", "instructor": "Engstrom, R", "days": "MW", "time": {"start": "11:10AM", "end": "12:25PM", "raw": "11:10AM - 12:25PM"}, "dates": "01/12/26 - 04/27/26", "building": "PHIL", "room": "B156", "course_number": "GEOG 1002"}, {"status": "OPEN", "crn": "43788", "subject": "GEOG", "course_num": "1002", "section": "30", "title": "Laboratory", "credits": "0.00", "instructor": "Engstrom, R", "days": "T", "time": {"start": "09:00AM", "end": "10:50AM", "raw": "09:00AM - 10:50AM"}, "dates": "01/12/26 - 04/27/26", "building": "SAMS", "room": "109", "course_number": "GEOG 1002"}, {"status": "OPEN", "crn": "43789", "subject": "GEOG", "course_num": "1002", "section": "31", "title": "Laboratory", "credits": "0.00", "instructor": "Engstrom, R", "days": "T", "time": {"start": "11:00AM", "end": "12:50PM", "raw": "11:00AM - 12:50PM"}, "dates": "01/12/26 - 04/27/26", "building": "SAMS", "room": "109", "course_number": "GEOG 1002"}, {"status": "OPEN", "crn": "44633", "subject": "GEOG", "course_num": "1002", "section": "32", "title": "Laboratory", "credits": "0.00", "instructor": "Engstrom, R", "days": "R", "time": {"start": "09:00AM", "end": "10:50AM", "raw": "09:00AM - 10:50AM"}, "dates": "01/12/26 - 04/27/26", "building": "SAMS", "room": "109", "course_number": "GEOG 1002"}, {"status": "OPEN", "crn": "43790", "subject": "GEOG", "course_num": "1002", "section": "33", "title": "Laboratory", "credits": "0.00", "instructor": "Engstrom, R", "days": "R", "time": {"start": "11:00AM", "end": "12:50PM", "raw": "11:00AM - 12:50PM"}, "dates": "01/12/26 - 04/27/26", "building": "SAMS", "room": "109", "course_number": "GEOG 1002"}, {"status": "OPEN", "crn": "45985", "subject": "GEOG", "course_num": "1003", "section": "10", "title": "Society and Environment", "credits": "3.00", "instructor": "McClure, P", "days": "TR", "time": {"start": "12:45PM", "end": "02:00PM", "raw": "12:45PM - 02:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "1957 E", "room": "B12", "course_number": "GEOG 1003"}, {"status": "OPEN", "crn": "43457", "subject": "GEOG", "course_num": "2104", "section": "10", "title": "Introduction to Cartography and GIS", "credits": "3.00", "instructor": "McDonald, A", "days": "TR", "time": {"start": "03:45PM", "end": "04:35PM", "raw": "03:45PM - 04:35PM"}, "dates": "01/12/26 - 04/27/26", "building": "COR", "room": "101A", "course_number": "GEOG 2104"}, {"status": "OPEN", "crn": "45505", "subject": "GEOG", "course_num": "2104", "section": "30", "title": "Laboratory", "credits": "0.00", "instructor": "McDonald, A", "days": "W", "time": {"start": "09:00AM", "end": "10:15AM", "raw": "09:00AM - 10:15AM"}, "dates": "01/12/26 - 04/27/26", "building": "SAMS", "room": "109", "course_number": "GEOG 2104"}, {"status": "OPEN", "crn": "45506", "subject": "GEOG", "course_num": "2104", "section": "31", "title": "Laboratory", "credits": "0.00", "instructor": "McDonald, A", "days": "W", "time": {"start": "10:30AM", "end": "11:45AM", "raw": "10:30AM - 11:45AM"}, "dates": "01/12/26 - 04/27/26", "building": "SAMS", "room": "109", "course_number": "GEOG 2104"}, {"status": "OPEN", "crn": "45919", "subject": "GEOG", "course_num": "2104", "section": "32", "title": "Laboratory", "credits": "0.00", "instructor": "McDonald, A", "days": "F", "time": {"start": "09:00AM", "end": "10:15AM", "raw": "09:00AM - 10:15AM"}, "dates": "01/12/26 - 04/27/26", "building": "SAMS", "room": "109", "course_number": "GEOG 2104"}, {"status": "OPEN", "crn": "45507", "subject": "GEOG", "course_num": "2104", "section": "33", "title": "Laboratory", "credits": "0.00", "instructor": "McDonald, A", "days": "F", "time": {"start": "10:30AM", "end": "11:45AM", "raw": "10:30AM - 11:45AM"}, "dates": "01/12/26 - 04/27/26", "building": "SAMS", "room": "109", "course_number": "GEOG 2104"}, {"status": "OPEN", "crn": "44434", "subject": "GEOG", "course_num": "2120", "section": "10", "title": "World Regional Geography", "credits": "3.00", "instructor": "Cullen, D", "days": "TR", "time": {"start": "11:10AM", "end": "12:25PM", "raw": "11:10AM - 12:25PM"}, "dates": "01/12/26 - 04/27/26", "building": "1957 E", "room": "113", "course_number": "GEOG 2120"}, {"status": "OPEN", "crn": "44398", "subject": "GEOG", "course_num": "2127", "section": "10", "title": "Population Geography", "credits": "3.00", "instructor": "Gardner, T", "days": "R", "time": {"start": "05:10PM", "end": "07:00PM", "raw": "05:10PM - 07:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "BELL", "room": "106", "course_number": "GEOG 2127"}, {"status": "OPEN", "crn": "46027", "subject": "GEOG", "course_num": "2129W", "section": "10", "title": "Biogeography", "credits": "3.00", "instructor": "Honzak, M", "days": "MW", "time": {"start": "02:20PM", "end": "03:35PM", "raw": "02:20PM - 03:35PM"}, "dates": "01/12/26 - 04/27/26", "building": "TOMP", "room": "307", "course_number": "GEOG 2129W"}, {"status": "OPEN", "crn": "46235", "subject": "GEOG", "course_num": "2133", "section": "10", "title": "People, Land, and Food", "credits": "3.00", "instructor": "Uyanik, J", "days": "T", "time": {"start": "05:10PM", "end": "07:00PM", "raw": "05:10PM - 07:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "ROME", "room": "459", "course_number": "GEOG 2133"}, {"status": "OPEN", "crn": "45920", "subject": "GEOG", "course_num": "2140", "section": "10", "title": "Cities and Societies", "credits": "3.00", "instructor": "Fisher, S", "days": "M", "time": {"start": "07:10PM", "end": "09:00PM", "raw": "07:10PM - 09:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "1776 G", "room": "C-119", "course_number": "GEOG 2140"}, {"status": "OPEN", "crn": "44746", "subject": "GEOG", "course_num": "2147", "section": "10", "title": "Military Geography", "credits": "3.00", "instructor": "Licari, A", "days": "T", "time": {"start": "05:10PM", "end": "07:00PM", "raw": "05:10PM - 07:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "SEH", "room": "7040", "course_number": "GEOG 2147"}, {"status": "OPEN", "crn": "45921", "subject": "GEOG", "course_num": "2148", "section": "10", "title": "Economic Geography", "credits": "3.00", "instructor": "Cullen, D", "days": "TR", "time": {"start": "02:20PM", "end": "03:35PM", "raw": "02:20PM - 03:35PM"}, "dates": "01/12/26 - 04/27/26", "building": "MON", "room": "115", "course_number": "GEOG 2148"}, {"status": "OPEN", "crn": "45020", "subject": "GEOG", "course_num": "3105", "section": "80", "title": "Techniques of Spatial Analysis", "credits": "3.00", "instructor": "Hurley, B", "days": "M", "time": {"start": "05:10PM", "end": "07:00PM", "raw": "05:10PM - 07:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "SAMS", "room": "109", "course_number": "GEOG 3105"}, {"status": "OPEN", "crn": "44233", "subject": "GEOG", "course_num": "6305", "section": "80", "title": "Geospatial Statistics", "credits": "3.00", "instructor": "Hurley, B", "days": "M", "time": {"start": "05:10PM", "end": "07:00PM", "raw": "05:10PM - 07:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "SAMS", "room": "109", "course_number": "GEOG 6305"}, {"status": "OPEN", "crn": "45614", "subject": "GEOG", "course_num": "3106", "section": "80", "title": "Intermediate Geographic Information Systems", "credits": "3.00", "instructor": "O'Brien, M", "days": "M", "time": {"start": "07:10PM", "end": "09:00PM", "raw": "07:10PM - 09:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "ROME", "room": "B104", "course_number": "GEOG 3106"}, {"status": "OPEN", "crn": "45758", "subject": "GEOG", "course_num": "6450", "section": "81", "title": "Geographical Info Systems II", "credits": "3.00", "instructor": "Hurley, B", "days": "M", "time": {"start": "07:10PM", "end": "09:00PM", "raw": "07:10PM - 09:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "ROME", "room": "B104", "course_number": "GEOG 6450"}, {"status": "OPEN", "crn": "44634", "subject": "GEOG", "course_num": "6306", "section": "80", "title": "Geographic Information Systems II", "credits": "3.00", "instructor": "Hurley, B", "days": "M", "time": {"start": "07:10PM", "end": "09:00PM", "raw": "07:10PM - 09:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "ROME", "room": "B104", "course_number": "GEOG 6306"}, {"status": "OPEN", "crn": "44885", "subject": "GEOG", "course_num": "3106", "section": "81", "title": "Intermediate Geographic Information Systems", "credits": "3.00", "instructor": "Hurley, B", "days": "M", "time": {"start": "02:10PM", "end": "04:00PM", "raw": "02:10PM - 04:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "SAMS", "room": "109", "course_number": "GEOG 3106"}, {"status": "OPEN", "crn": "47514", "subject": "GEOG", "course_num": "6306", "section": "81", "title": "Geographic Information Systems II", "credits": "3.00", "instructor": "O'Brien, M", "days": "M", "time": {"start": "02:10PM", "end": "04:00PM", "raw": "02:10PM - 04:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "SAMS", "room": "109", "course_number": "GEOG 6306"}, {"status": "OPEN", "crn": "46556", "subject": "GEOG", "course_num": "3107", "section": "10", "title": "Introduction to Remote Sensing", "credits": "3.00", "instructor": "Copenhaver, A", "days": "R", "time": {"start": "07:10PM", "end": "09:00PM", "raw": "07:10PM - 09:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "SAMS", "room": "109", "course_number": "GEOG 3107"}, {"status": "OPEN", "crn": "46236", "subject": "GEOG", "course_num": "3128", "section": "80", "title": "Geomorphology and Natural Hazards", "credits": "3.00", "instructor": "Streletskiy, D", "days": "MW", "time": {"start": "12:45PM", "end": "02:00PM", "raw": "12:45PM - 02:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "MON", "room": "110", "course_number": "GEOG 3128"}, {"status": "OPEN", "crn": "47416", "subject": "GEOG", "course_num": "6293", "section": "82", "title": "Geomorphology and Nat Hazards", "credits": "3.00", "instructor": "Streletskiy, D", "days": "MW", "time": {"start": "12:45PM", "end": "02:00PM", "raw": "12:45PM - 02:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "MON", "room": "110", "course_number": "GEOG 6293"}, {"status": "OPEN", "crn": "46017", "subject": "GEOG", "course_num": "3145", "section": "10", "title": "Cultural Geography", "credits": "3.00", "instructor": "Uyanik, J", "days": "TR", "time": {"start": "12:45PM", "end": "02:00PM", "raw": "12:45PM - 02:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "TOMP", "room": "206", "course_number": "GEOG 3145"}, {"status": "OPEN", "crn": "45422", "subject": "GEOG", "course_num": "3193", "section": "10", "title": "Environmental Law and Policy", "credits": "3.00", "instructor": "Squire, D", "days": "TR", "time": {"start": "11:10AM", "end": "12:25PM", "raw": "11:10AM - 12:25PM"}, "dates": "01/12/26 - 04/27/26", "building": "BELL", "room": "104", "course_number": "GEOG 3193"}, {"status": "OPEN", "crn": "48244", "subject": "GEOG", "course_num": "3194", "section": "10", "title": "Climatic Change", "credits": "3.00", "instructor": "Streletskiy, D", "days": "MW", "time": {"start": "12:45PM", "end": "02:00PM", "raw": "12:45PM - 02:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "1957 E", "room": "111", "course_number": "GEOG 3194"}, {"status": "OPEN", "crn": "48245", "subject": "GEOG", "course_num": "3194", "section": "11", "title": "Climate Change & Public Health", "credits": "3.00", "instructor": "McClure, P", "days": "T", "time": {"start": "05:10PM", "end": "07:00PM", "raw": "05:10PM - 07:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "1957 E", "room": "B14", "course_number": "GEOG 3194"}, {"status": "OPEN", "crn": "46448", "subject": "GEOG", "course_num": "3195", "section": "10", "title": "Race, Ethnicity, and Place", "credits": "3.00", "instructor": "Price, M", "days": "MW", "time": {"start": "12:45PM", "end": "02:00PM", "raw": "12:45PM - 02:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "MON", "room": "353", "course_number": "GEOG 3195"}, {"status": "OPEN", "crn": "48246", "subject": "GEOG", "course_num": "3195", "section": "11", "title": "Global Environmental Justice", "credits": "3.00", "instructor": "Odell, S", "days": "MW", "time": {"start": "12:45PM", "end": "02:00PM", "raw": "12:45PM - 02:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "TOMP", "room": "302", "course_number": "GEOG 3195"}, {"status": "OPEN", "crn": "47443", "subject": "GEOG", "course_num": "3195", "section": "81", "title": "Population & Health", "credits": "3.00", "instructor": "Chacko, E", "days": "R", "time": {"start": "05:10PM", "end": "07:00PM", "raw": "05:10PM - 07:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "1776 G", "room": "C-106", "course_number": "GEOG 3195"}, {"status": "OPEN", "crn": "46868", "subject": "GEOG", "course_num": "6223", "section": "80", "title": "Seminar: Population and Health", "credits": "3.00", "instructor": "Chacko, E", "days": "R", "time": {"start": "05:10PM", "end": "07:00PM", "raw": "05:10PM - 07:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "1776 G", "room": "C-106", "course_number": "GEOG 6223"}, {"status": "OPEN", "crn": "45750", "subject": "GEOG", "course_num": "3198", "section": "80", "title": "OpenSource: Geo-Programming II", "credits": "3.00", "instructor": "Mann, M", "days": "T", "time": {"start": "11:00AM", "end": "01:00PM", "raw": "11:00AM - 01:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "Not specified", "room": "Not specified", "course_number": "GEOG 3198"}, {"status": "OPEN", "crn": "45616", "subject": "GEOG", "course_num": "6450", "section": "80", "title": "OpenSource: Geo-Programming II", "credits": "3.00", "instructor": "Mann, M", "days": "T", "time": {"start": "05:10PM", "end": "07:00PM", "raw": "05:10PM - 07:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "GELM", "room": "463", "course_number": "GEOG 6450"}, {"status": "OPEN", "crn": "45617", "subject": "GEOG", "course_num": "6293", "section": "80", "title": "OpenSource: Geo-Programming II", "credits": "3.00", "instructor": "Mann, M", "days": "T", "time": {"start": "05:10PM", "end": "07:00PM", "raw": "05:10PM - 07:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "GELM", "room": "463", "course_number": "GEOG 6293"}, {"status": "OPEN", "crn": "46926", "subject": "GEOG", "course_num": "3198", "section": "81", "title": "Geographies of Social Justice", "credits": "3.00", "instructor": "Atia, M", "days": "T", "time": {"start": "05:10PM", "end": "07:00PM", "raw": "05:10PM - 07:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "1957 E", "room": "313", "course_number": "GEOG 3198"}, {"status": "OPEN", "crn": "46391", "subject": "GEOG", "course_num": "6293", "section": "81", "title": "Geographies of Social Justice", "credits": "3.00", "instructor": "Atia, M", "days": "T", "time": {"start": "11:00AM", "end": "01:00PM", "raw": "11:00AM - 01:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "1957 E", "room": "313", "course_number": "GEOG 6293"}, {"status": "OPEN", "crn": "45302", "subject": "GEOG", "course_num": "3218", "section": "80", "title": "Arctic Systems", "credits": "3.00", "instructor": "Shiklomanov, N", "days": "W", "time": {"start": "05:10PM", "end": "07:00PM", "raw": "05:10PM - 07:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "SMTH", "room": "115", "course_number": "GEOG 3218"}, {"status": "OPEN", "crn": "45303", "subject": "GEOG", "course_num": "6218", "section": "80", "title": "Arctic Systems", "credits": "3.00", "instructor": "Shiklomanov, N", "days": "W", "time": {"start": "05:10PM", "end": "07:00PM", "raw": "05:10PM - 07:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "SMTH", "room": "115", "course_number": "GEOG 6218"}, {"status": "OPEN", "crn": "48248", "subject": "GEOG", "course_num": "3275", "section": "10", "title": "Sustainable Food Systems", "credits": "3.00", "instructor": "Kansanga, M", "days": "M", "time": {"start": "05:10PM", "end": "07:00PM", "raw": "05:10PM - 07:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "1957 E", "room": "111", "course_number": "GEOG 3275"}, {"status": "OPEN", "crn": "44537", "subject": "GEOG", "course_num": "4307", "section": "80", "title": "Digital Image Processing and Analysis", "credits": "3.00", "instructor": "Engstrom, R", "days": "R", "time": {"start": "05:10PM", "end": "07:00PM", "raw": "05:10PM - 07:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "SAMS", "room": "109", "course_number": "GEOG 4307"}, {"status": "OPEN", "crn": "44767", "subject": "GEOG", "course_num": "6307", "section": "80", "title": "Digital Image Processing", "credits": "3.00", "instructor": "Engstrom, R", "days": "R", "time": {"start": "05:10PM", "end": "07:00PM", "raw": "05:10PM - 07:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "SAMS", "room": "109", "course_number": "GEOG 6307"}, {"status": "OPEN", "crn": "45177", "subject": "GEOG", "course_num": "4310", "section": "80", "title": "Geovisualization and Cartography", "credits": "3.00", "instructor": "O'Brien, M", "days": "W", "time": {"start": "07:10PM", "end": "09:00PM", "raw": "07:10PM - 09:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "SAMS", "room": "109", "course_number": "GEOG 4310"}, {"status": "OPEN", "crn": "45178", "subject": "GEOG", "course_num": "6310", "section": "80", "title": "Geovisualization and Cartography", "credits": "3.00", "instructor": "O'Brien, M", "days": "W", "time": {"start": "07:10PM", "end": "09:00PM", "raw": "07:10PM - 09:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "SAMS", "room": "109", "course_number": "GEOG 6310"}, {"status": "OPEN", "crn": "44585", "subject": "GEOG", "course_num": "4311", "section": "80", "title": "Open Source Solutions for Geospatial Project Management", "credits": "3.00", "instructor": "Hinton, R", "days": "T", "time": {"start": "05:10PM", "end": "07:00PM", "raw": "05:10PM - 07:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "SAMS", "room": "109", "course_number": "GEOG 4311"}, {"status": "OPEN", "crn": "44635", "subject": "GEOG", "course_num": "6311", "section": "80", "title": "Open Source Solutions for Geospatial Project Management", "credits": "3.00", "instructor": "Hinton, R", "days": "T", "time": {"start": "05:10PM", "end": "07:00PM", "raw": "05:10PM - 07:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "SAMS", "room": "109", "course_number": "GEOG 6311"}, {"status": "OPEN", "crn": "48249", "subject": "GEOG", "course_num": "6220", "section": "10", "title": "Climatic Change", "credits": "3.00", "instructor": "Streletskiy, D", "days": "MW", "time": {"start": "12:45PM", "end": "02:00PM", "raw": "12:45PM - 02:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "Not specified", "room": "Not specified", "course_number": "GEOG 6220"}, {"status": "OPEN", "crn": "45922", "subject": "GEOG", "course_num": "6232", "section": "10", "title": "Migration and Development", "credits": "3.00", "instructor": "Price, M", "days": "W", "time": {"start": "05:10PM", "end": "07:00PM", "raw": "05:10PM - 07:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "MON", "room": "351", "course_number": "GEOG 6232"}, {"status": "OPEN", "crn": "48250", "subject": "GEOG", "course_num": "6243", "section": "80", "title": "Seminar in Urban Geography", "credits": "3.00", "instructor": "Atia, M", "days": "W", "time": {"start": "05:10PM", "end": "07:00PM", "raw": "05:10PM - 07:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "PHIL", "room": "348", "course_number": "GEOG 6243"}, {"status": "OPEN", "crn": "44435", "subject": "GEOG", "course_num": "6300", "section": "10", "title": "Geography Capstone Internship", "credits": "3.00", "instructor": "Mann, M", "days": "F", "time": {"start": "02:20PM", "end": "03:35PM", "raw": "02:20PM - 03:35PM"}, "dates": "01/12/26 - 04/27/26", "building": "Not specified", "room": "Not specified", "course_number": "GEOG 6300"}, {"status": "OPEN", "crn": "46028", "subject": "GEOG", "course_num": "6304", "section": "80", "title": "Geographic Information Systems I", "credits": "3.00", "instructor": "Johnson, S", "days": "T", "time": {"start": "05:10PM", "end": "07:00PM", "raw": "05:10PM - 07:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "SAMS", "room": "109", "course_number": "GEOG 6304"}, {"status": "OPEN", "crn": "46968", "subject": "GEOG", "course_num": "6304", "section": "82", "title": "Geographic Information Systems I", "credits": "3.00", "instructor": "Johnson, S", "days": "T", "time": {"start": "05:10PM", "end": "07:00PM", "raw": "05:10PM - 07:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "SAMS", "room": "109", "course_number": "GEOG 6304"}];
+        const courses = [{"status": "OPEN", "crn": "46234", "subject": "GEOG", "course_num": "1001", "section": "10", "title": "Introduction to Human Geography", "credits": "3.00", "instructor": "Chacko, E", "days": "TR", "time": {"start": "02:20PM", "end": "03:35PM", "raw": "02:20PM - 03:35PM"}, "dates": "01/12/26 - 04/27/26", "building": "1957 E", "room": "B12", "course_number": "GEOG 1001"}, {"status": "OPEN", "crn": "43145", "subject": "GEOG", "course_num": "1002", "section": "10", "title": "Introduction to Physical Geography", "credits": "4.00", "instructor": "Engstrom, R", "days": "MW", "time": {"start": "11:10AM", "end": "12:25PM", "raw": "11:10AM - 12:25PM"}, "dates": "01/12/26 - 04/27/26", "building": "PHIL", "room": "B156", "course_number": "GEOG 1002"}, {"status": "OPEN", "crn": "43788", "subject": "GEOG", "course_num": "1002", "section": "30", "title": "Laboratory", "credits": "0.00", "instructor": "Engstrom, R", "days": "T", "time": {"start": "09:00AM", "end": "10:50AM", "raw": "09:00AM - 10:50AM"}, "dates": "01/12/26 - 04/27/26", "building": "SAMS", "room": "109", "course_number": "GEOG 1002"}, {"status": "OPEN", "crn": "43789", "subject": "GEOG", "course_num": "1002", "section": "31", "title": "Laboratory", "credits": "0.00", "instructor": "Engstrom, R", "days": "T", "time": {"start": "11:00AM", "end": "12:50PM", "raw": "11:00AM - 12:50PM"}, "dates": "01/12/26 - 04/27/26", "building": "SAMS", "room": "109", "course_number": "GEOG 1002"}, {"status": "OPEN", "crn": "44633", "subject": "GEOG", "course_num": "1002", "section": "32", "title": "Laboratory", "credits": "0.00", "instructor": "Engstrom, R", "days": "R", "time": {"start": "09:00AM", "end": "10:50AM", "raw": "09:00AM - 10:50AM"}, "dates": "01/12/26 - 04/27/26", "building": "SAMS", "room": "109", "course_number": "GEOG 1002"}, {"status": "OPEN", "crn": "43790", "subject": "GEOG", "course_num": "1002", "section": "33", "title": "Laboratory", "credits": "0.00", "instructor": "Engstrom, R", "days": "R", "time": {"start": "11:00AM", "end": "12:50PM", "raw": "11:00AM - 12:50PM"}, "dates": "01/12/26 - 04/27/26", "building": "SAMS", "room": "109", "course_number": "GEOG 1002"}, {"status": "OPEN", "crn": "45985", "subject": "GEOG", "course_num": "1003", "section": "10", "title": "Society and Environment", "credits": "3.00", "instructor": "McClure, P", "days": "TR", "time": {"start": "12:45PM", "end": "02:00PM", "raw": "12:45PM - 02:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "1957 E", "room": "B12", "course_number": "GEOG 1003"}, {"status": "OPEN", "crn": "43457", "subject": "GEOG", "course_num": "2104", "section": "10", "title": "Introduction to Cartography and GIS", "credits": "3.00", "instructor": "McDonald, A", "days": "TR", "time": {"start": "03:45PM", "end": "04:35PM", "raw": "03:45PM - 04:35PM"}, "dates": "01/12/26 - 04/27/26", "building": "COR", "room": "101A", "course_number": "GEOG 2104"}, {"status": "OPEN", "crn": "45505", "subject": "GEOG", "course_num": "2104", "section": "30", "title": "Laboratory", "credits": "0.00", "instructor": "McDonald, A", "days": "W", "time": {"start": "09:00AM", "end": "10:15AM", "raw": "09:00AM - 10:15AM"}, "dates": "01/12/26 - 04/27/26", "building": "SAMS", "room": "109", "course_number": "GEOG 2104"}, {"status": "OPEN", "crn": "45506", "subject": "GEOG", "course_num": "2104", "section": "31", "title": "Laboratory", "credits": "0.00", "instructor": "McDonald, A", "days": "W", "time": {"start": "10:30AM", "end": "11:45AM", "raw": "10:30AM - 11:45AM"}, "dates": "01/12/26 - 04/27/26", "building": "SAMS", "room": "109", "course_number": "GEOG 2104"}, {"status": "OPEN", "crn": "45919", "subject": "GEOG", "course_num": "2104", "section": "32", "title": "Laboratory", "credits": "0.00", "instructor": "McDonald, A", "days": "F", "time": {"start": "09:00AM", "end": "10:15AM", "raw": "09:00AM - 10:15AM"}, "dates": "01/12/26 - 04/27/26", "building": "SAMS", "room": "109", "course_number": "GEOG 2104"}, {"status": "OPEN", "crn": "45507", "subject": "GEOG", "course_num": "2104", "section": "33", "title": "Laboratory", "credits": "0.00", "instructor": "McDonald, A", "days": "F", "time": {"start": "10:30AM", "end": "11:45AM", "raw": "10:30AM - 11:45AM"}, "dates": "01/12/26 - 04/27/26", "building": "SAMS", "room": "109", "course_number": "GEOG 2104"}, {"status": "OPEN", "crn": "44434", "subject": "GEOG", "course_num": "2120", "section": "10", "title": "World Regional Geography", "credits": "3.00", "instructor": "Cullen, D", "days": "TR", "time": {"start": "11:10AM", "end": "12:25PM", "raw": "11:10AM - 12:25PM"}, "dates": "01/12/26 - 04/27/26", "building": "1957 E", "room": "113", "course_number": "GEOG 2120"}, {"status": "OPEN", "crn": "44398", "subject": "GEOG", "course_num": "2127", "section": "10", "title": "Population Geography", "credits": "3.00", "instructor": "Gardner, T", "days": "R", "time": {"start": "05:10PM", "end": "07:00PM", "raw": "05:10PM - 07:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "BELL", "room": "106", "course_number": "GEOG 2127"}, {"status": "OPEN", "crn": "46027", "subject": "GEOG", "course_num": "2129W", "section": "10", "title": "Biogeography", "credits": "3.00", "instructor": "Honzak, M", "days": "MW", "time": {"start": "02:20PM", "end": "03:35PM", "raw": "02:20PM - 03:35PM"}, "dates": "01/12/26 - 04/27/26", "building": "TOMP", "room": "307", "course_number": "GEOG 2129W"}, {"status": "OPEN", "crn": "46235", "subject": "GEOG", "course_num": "2133", "section": "10", "title": "People, Land, and Food", "credits": "3.00", "instructor": "Uyanik, J", "days": "T", "time": {"start": "05:10PM", "end": "07:00PM", "raw": "05:10PM - 07:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "ROME", "room": "459", "course_number": "GEOG 2133"}, {"status": "OPEN", "crn": "45920", "subject": "GEOG", "course_num": "2140", "section": "10", "title": "Cities and Societies", "credits": "3.00", "instructor": "Fisher, S", "days": "M", "time": {"start": "07:10PM", "end": "09:00PM", "raw": "07:10PM - 09:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "1776 G", "room": "C-119", "course_number": "GEOG 2140"}, {"status": "OPEN", "crn": "44746", "subject": "GEOG", "course_num": "2147", "section": "10", "title": "Military Geography", "credits": "3.00", "instructor": "Licari, A", "days": "T", "time": {"start": "05:10PM", "end": "07:00PM", "raw": "05:10PM - 07:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "SEH", "room": "7040", "course_number": "GEOG 2147"}, {"status": "OPEN", "crn": "45921", "subject": "GEOG", "course_num": "2148", "section": "10", "title": "Economic Geography", "credits": "3.00", "instructor": "Cullen, D", "days": "TR", "time": {"start": "02:20PM", "end": "03:35PM", "raw": "02:20PM - 03:35PM"}, "dates": "01/12/26 - 04/27/26", "building": "MON", "room": "115", "course_number": "GEOG 2148"}, {"status": "OPEN", "crn": "45020", "subject": "GEOG", "course_num": "3105", "section": "80", "title": "Techniques of Spatial Analysis", "credits": "3.00", "instructor": "Hurley, B", "days": "M", "time": {"start": "05:10PM", "end": "07:00PM", "raw": "05:10PM - 07:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "SAMS", "room": "109", "course_number": "GEOG 3105"}, {"status": "OPEN", "crn": "44233", "subject": "GEOG", "course_num": "6305", "section": "80", "title": "Geospatial Statistics", "credits": "3.00", "instructor": "Hurley, B", "days": "M", "time": {"start": "05:10PM", "end": "07:00PM", "raw": "05:10PM - 07:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "SAMS", "room": "109", "course_number": "GEOG 6305"}, {"status": "OPEN", "crn": "45614", "subject": "GEOG", "course_num": "3106", "section": "80", "title": "Intermediate Geographic Information Systems", "credits": "3.00", "instructor": "O'Brien, M", "days": "M", "time": {"start": "07:10PM", "end": "09:00PM", "raw": "07:10PM - 09:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "ROME", "room": "B104", "course_number": "GEOG 3106"}, {"status": "OPEN", "crn": "44634", "subject": "GEOG", "course_num": "6306", "section": "80", "title": "Geographic Information Systems II", "credits": "3.00", "instructor": "Hurley, B", "days": "M", "time": {"start": "07:10PM", "end": "09:00PM", "raw": "07:10PM - 09:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "ROME", "room": "B104", "course_number": "GEOG 6306"}, {"status": "OPEN", "crn": "45758", "subject": "GEOG", "course_num": "6450", "section": "81", "title": "Geographical Info Systems II", "credits": "3.00", "instructor": "Hurley, B", "days": "M", "time": {"start": "07:10PM", "end": "09:00PM", "raw": "07:10PM - 09:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "ROME", "room": "B104", "course_number": "GEOG 6450"}, {"status": "OPEN", "crn": "44885", "subject": "GEOG", "course_num": "3106", "section": "81", "title": "Intermediate Geographic Information Systems", "credits": "3.00", "instructor": "Hurley, B", "days": "M", "time": {"start": "02:10PM", "end": "04:00PM", "raw": "02:10PM - 04:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "SAMS", "room": "109", "course_number": "GEOG 3106"}, {"status": "OPEN", "crn": "47514", "subject": "GEOG", "course_num": "6306", "section": "81", "title": "Geographic Information Systems II", "credits": "3.00", "instructor": "O'Brien, M", "days": "M", "time": {"start": "02:10PM", "end": "04:00PM", "raw": "02:10PM - 04:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "SAMS", "room": "109", "course_number": "GEOG 6306"}, {"status": "OPEN", "crn": "46556", "subject": "GEOG", "course_num": "3107", "section": "10", "title": "Introduction to Remote Sensing", "credits": "3.00", "instructor": "Copenhaver, A", "days": "R", "time": {"start": "07:10PM", "end": "09:00PM", "raw": "07:10PM - 09:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "SAMS", "room": "109", "course_number": "GEOG 3107"}, {"status": "OPEN", "crn": "46236", "subject": "GEOG", "course_num": "3128", "section": "80", "title": "Geomorphology and Natural Hazards", "credits": "3.00", "instructor": "Streletskiy, D", "days": "MW", "time": {"start": "12:45PM", "end": "02:00PM", "raw": "12:45PM - 02:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "MON", "room": "110", "course_number": "GEOG 3128"}, {"status": "OPEN", "crn": "47416", "subject": "GEOG", "course_num": "6293", "section": "82", "title": "Geomorphology and Nat Hazards", "credits": "3.00", "instructor": "Streletskiy, D", "days": "MW", "time": {"start": "12:45PM", "end": "02:00PM", "raw": "12:45PM - 02:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "MON", "room": "110", "course_number": "GEOG 6293"}, {"status": "OPEN", "crn": "46017", "subject": "GEOG", "course_num": "3145", "section": "10", "title": "Cultural Geography", "credits": "3.00", "instructor": "Uyanik, J", "days": "TR", "time": {"start": "12:45PM", "end": "02:00PM", "raw": "12:45PM - 02:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "TOMP", "room": "206", "course_number": "GEOG 3145"}, {"status": "OPEN", "crn": "45422", "subject": "GEOG", "course_num": "3193", "section": "10", "title": "Environmental Law and Policy", "credits": "3.00", "instructor": "Squire, D", "days": "TR", "time": {"start": "11:10AM", "end": "12:25PM", "raw": "11:10AM - 12:25PM"}, "dates": "01/12/26 - 04/27/26", "building": "BELL", "room": "104", "course_number": "GEOG 3193"}, {"status": "OPEN", "crn": "48244", "subject": "GEOG", "course_num": "3194", "section": "10", "title": "Climatic Change", "credits": "3.00", "instructor": "Streletskiy, D", "days": "MW", "time": {"start": "12:45PM", "end": "02:00PM", "raw": "12:45PM - 02:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "1957 E", "room": "111", "course_number": "GEOG 3194"}, {"status": "OPEN", "crn": "48245", "subject": "GEOG", "course_num": "3194", "section": "11", "title": "Climate Change & Public Health", "credits": "3.00", "instructor": "McClure, P", "days": "T", "time": {"start": "05:10PM", "end": "07:00PM", "raw": "05:10PM - 07:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "1957 E", "room": "B14", "course_number": "GEOG 3194"}, {"status": "OPEN", "crn": "46448", "subject": "GEOG", "course_num": "3195", "section": "10", "title": "Race, Ethnicity, and Place", "credits": "3.00", "instructor": "Price, M", "days": "MW", "time": {"start": "12:45PM", "end": "02:00PM", "raw": "12:45PM - 02:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "MON", "room": "353", "course_number": "GEOG 3195"}, {"status": "OPEN", "crn": "48246", "subject": "GEOG", "course_num": "3195", "section": "11", "title": "Global Environmental Justice", "credits": "3.00", "instructor": "Odell, S", "days": "MW", "time": {"start": "12:45PM", "end": "02:00PM", "raw": "12:45PM - 02:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "TOMP", "room": "302", "course_number": "GEOG 3195"}, {"status": "OPEN", "crn": "47443", "subject": "GEOG", "course_num": "3195", "section": "81", "title": "Population & Health", "credits": "3.00", "instructor": "Chacko, E", "days": "R", "time": {"start": "05:10PM", "end": "07:00PM", "raw": "05:10PM - 07:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "1776 G", "room": "C-106", "course_number": "GEOG 3195"}, {"status": "OPEN", "crn": "46868", "subject": "GEOG", "course_num": "6223", "section": "80", "title": "Seminar: Population and Health", "credits": "3.00", "instructor": "Chacko, E", "days": "R", "time": {"start": "05:10PM", "end": "07:00PM", "raw": "05:10PM - 07:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "1776 G", "room": "C-106", "course_number": "GEOG 6223"}, {"status": "OPEN", "crn": "45750", "subject": "GEOG", "course_num": "3198", "section": "80", "title": "OpenSource: Geo-Programming II", "credits": "3.00", "instructor": "Mann, M", "days": "T", "time": {"start": "11:00AM", "end": "01:00PM", "raw": "11:00AM - 01:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "Not specified", "room": "Not specified", "course_number": "GEOG 3198"}, {"status": "OPEN", "crn": "45616", "subject": "GEOG", "course_num": "6450", "section": "80", "title": "OpenSource: Geo-Programming II", "credits": "3.00", "instructor": "Mann, M", "days": "T", "time": {"start": "05:10PM", "end": "07:00PM", "raw": "05:10PM - 07:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "GELM", "room": "463", "course_number": "GEOG 6450"}, {"status": "OPEN", "crn": "45617", "subject": "GEOG", "course_num": "6293", "section": "80", "title": "OpenSource: Geo-Programming II", "credits": "3.00", "instructor": "Mann, M", "days": "T", "time": {"start": "05:10PM", "end": "07:00PM", "raw": "05:10PM - 07:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "GELM", "room": "463", "course_number": "GEOG 6293"}, {"status": "OPEN", "crn": "46926", "subject": "GEOG", "course_num": "3198", "section": "81", "title": "Geographies of Social Justice", "credits": "3.00", "instructor": "Atia, M", "days": "T", "time": {"start": "05:10PM", "end": "07:00PM", "raw": "05:10PM - 07:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "1957 E", "room": "313", "course_number": "GEOG 3198"}, {"status": "OPEN", "crn": "46391", "subject": "GEOG", "course_num": "6293", "section": "81", "title": "Geographies of Social Justice", "credits": "3.00", "instructor": "Atia, M", "days": "T", "time": {"start": "11:00AM", "end": "01:00PM", "raw": "11:00AM - 01:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "1957 E", "room": "313", "course_number": "GEOG 6293"}, {"status": "OPEN", "crn": "45302", "subject": "GEOG", "course_num": "3218", "section": "80", "title": "Arctic Systems", "credits": "3.00", "instructor": "Shiklomanov, N", "days": "W", "time": {"start": "05:10PM", "end": "07:00PM", "raw": "05:10PM - 07:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "SMTH", "room": "115", "course_number": "GEOG 3218"}, {"status": "OPEN", "crn": "45303", "subject": "GEOG", "course_num": "6218", "section": "80", "title": "Arctic Systems", "credits": "3.00", "instructor": "Shiklomanov, N", "days": "W", "time": {"start": "05:10PM", "end": "07:00PM", "raw": "05:10PM - 07:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "SMTH", "room": "115", "course_number": "GEOG 6218"}, {"status": "OPEN", "crn": "48248", "subject": "GEOG", "course_num": "3275", "section": "10", "title": "Sustainable Food Systems", "credits": "3.00", "instructor": "Kansanga, M", "days": "M", "time": {"start": "05:10PM", "end": "07:00PM", "raw": "05:10PM - 07:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "1957 E", "room": "111", "course_number": "GEOG 3275"}, {"status": "OPEN", "crn": "44537", "subject": "GEOG", "course_num": "4307", "section": "80", "title": "Digital Image Processing and Analysis", "credits": "3.00", "instructor": "Engstrom, R", "days": "R", "time": {"start": "05:10PM", "end": "07:00PM", "raw": "05:10PM - 07:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "SAMS", "room": "109", "course_number": "GEOG 4307"}, {"status": "OPEN", "crn": "44767", "subject": "GEOG", "course_num": "6307", "section": "80", "title": "Digital Image Processing", "credits": "3.00", "instructor": "Engstrom, R", "days": "R", "time": {"start": "05:10PM", "end": "07:00PM", "raw": "05:10PM - 07:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "SAMS", "room": "109", "course_number": "GEOG 6307"}, {"status": "OPEN", "crn": "45177", "subject": "GEOG", "course_num": "4310", "section": "80", "title": "Geovisualization and Cartography", "credits": "3.00", "instructor": "O'Brien, M", "days": "W", "time": {"start": "07:10PM", "end": "09:00PM", "raw": "07:10PM - 09:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "SAMS", "room": "109", "course_number": "GEOG 4310"}, {"status": "OPEN", "crn": "45178", "subject": "GEOG", "course_num": "6310", "section": "80", "title": "Geovisualization and Cartography", "credits": "3.00", "instructor": "O'Brien, M", "days": "W", "time": {"start": "07:10PM", "end": "09:00PM", "raw": "07:10PM - 09:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "SAMS", "room": "109", "course_number": "GEOG 6310"}, {"status": "OPEN", "crn": "44585", "subject": "GEOG", "course_num": "4311", "section": "80", "title": "Open Source Solutions for Geospatial Project Management", "credits": "3.00", "instructor": "Hinton, R", "days": "T", "time": {"start": "05:10PM", "end": "07:00PM", "raw": "05:10PM - 07:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "SAMS", "room": "109", "course_number": "GEOG 4311"}, {"status": "OPEN", "crn": "44635", "subject": "GEOG", "course_num": "6311", "section": "80", "title": "Open Source Solutions for Geospatial Project Management", "credits": "3.00", "instructor": "Hinton, R", "days": "T", "time": {"start": "05:10PM", "end": "07:00PM", "raw": "05:10PM - 07:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "SAMS", "room": "109", "course_number": "GEOG 6311"}, {"status": "OPEN", "crn": "48249", "subject": "GEOG", "course_num": "6220", "section": "10", "title": "Climatic Change", "credits": "3.00", "instructor": "Streletskiy, D", "days": "MW", "time": {"start": "12:45PM", "end": "02:00PM", "raw": "12:45PM - 02:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "Not specified", "room": "Not specified", "course_number": "GEOG 6220"}, {"status": "OPEN", "crn": "45922", "subject": "GEOG", "course_num": "6232", "section": "10", "title": "Migration and Development", "credits": "3.00", "instructor": "Price, M", "days": "W", "time": {"start": "05:10PM", "end": "07:00PM", "raw": "05:10PM - 07:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "MON", "room": "351", "course_number": "GEOG 6232"}, {"status": "OPEN", "crn": "48250", "subject": "GEOG", "course_num": "6243", "section": "80", "title": "Seminar in Urban Geography", "credits": "3.00", "instructor": "Atia, M", "days": "W", "time": {"start": "05:10PM", "end": "07:00PM", "raw": "05:10PM - 07:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "PHIL", "room": "348", "course_number": "GEOG 6243"}, {"status": "OPEN", "crn": "44435", "subject": "GEOG", "course_num": "6300", "section": "10", "title": "Geography Capstone Internship", "credits": "3.00", "instructor": "Mann, M", "days": "F", "time": {"start": "02:20PM", "end": "03:35PM", "raw": "02:20PM - 03:35PM"}, "dates": "01/12/26 - 04/27/26", "building": "Not specified", "room": "Not specified", "course_number": "GEOG 6300"}, {"status": "OPEN", "crn": "46028", "subject": "GEOG", "course_num": "6304", "section": "80", "title": "Geographic Information Systems I", "credits": "3.00", "instructor": "Johnson, S", "days": "T", "time": {"start": "05:10PM", "end": "07:00PM", "raw": "05:10PM - 07:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "SAMS", "room": "109", "course_number": "GEOG 6304"}, {"status": "OPEN", "crn": "46968", "subject": "GEOG", "course_num": "6304", "section": "82", "title": "Geographic Information Systems I", "credits": "3.00", "instructor": "Johnson, S", "days": "T", "time": {"start": "05:10PM", "end": "07:00PM", "raw": "05:10PM - 07:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "SAMS", "room": "109", "course_number": "GEOG 6304"}];
         const dayMap = { 'M': 'monday', 'T': 'tuesday', 'W': 'wednesday', 'R': 'thursday', 'F': 'friday' };
         let instructorColors = {};
         let selectedInstructors = new Set();
@@ -498,6 +523,8 @@
         let ignoredConflicts = new Set(JSON.parse(localStorage.getItem('ignoredConflicts') || '[]'));
         let editIgnoredConflicts = new Set(JSON.parse(localStorage.getItem('editIgnoredConflicts') || '[]'));
         let currentEditCRN = null;
+        let editSelectedInstructors = new Set();
+        let editRoomFilter = 'all';
 
         // Generate unique color for each instructor using HSL
         function generateInstructorColors() {
@@ -533,6 +560,12 @@
                 content.style.display = 'none';
             });
             document.getElementById(tabName + '-tab').style.display = 'block';
+
+            // Show/hide main calendar filters (hide in edit mode, show otherwise)
+            const mainFilters = document.getElementById('mainCalendarFilters');
+            if (mainFilters) {
+                mainFilters.style.display = tabName === 'edit-schedule' ? 'none' : 'flex';
+            }
 
             // Load tab-specific content
             if (tabName === 'planning-mode') {
@@ -1271,6 +1304,8 @@
         function initializeEditMode() {
             populateTimePickers();
             populateInstructorDatalist();
+            populateEditInstructorFilter();
+            populateEditRoomFilter();
             renderEditCalendar();
             displayEditModeConflicts();
             updateEditCount();
@@ -1280,6 +1315,155 @@
                 checkbox.addEventListener('change', syncDayCheckboxes);
             });
         }
+
+        // Populate instructor checkboxes in edit mode
+        function populateEditInstructorFilter() {
+            const instructorList = document.getElementById('editInstructorList');
+            instructorList.innerHTML = ''; // Clear existing
+            const instructors = [...new Set(editedCourses.map(c => c.instructor))].sort();
+
+            // Ensure all instructors have colors
+            instructors.forEach(instructor => {
+                if (!instructorColors[instructor]) {
+                    // Generate a color if missing
+                    const hue = Math.floor(Math.random() * 360);
+                    instructorColors[instructor] = `hsl(${hue}, 70%, 60%)`;
+                }
+            });
+
+            instructors.forEach(instructor => {
+                const item = document.createElement('div');
+                item.className = 'instructor-checkbox-item';
+
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.id = `edit-instructor-${instructor.replace(/\s+/g, '-')}`;
+                checkbox.value = instructor;
+                checkbox.checked = editSelectedInstructors.size === 0 || editSelectedInstructors.has(instructor);
+                checkbox.onchange = () => toggleEditInstructorSelection(instructor);
+
+                const label = document.createElement('label');
+                label.setAttribute('for', checkbox.id);
+
+                const colorIndicator = document.createElement('span');
+                colorIndicator.className = 'instructor-color-indicator';
+                colorIndicator.style.backgroundColor = getInstructorColor(instructor);
+
+                label.appendChild(colorIndicator);
+                label.appendChild(document.createTextNode(instructor));
+
+                item.appendChild(checkbox);
+                item.appendChild(label);
+                instructorList.appendChild(item);
+            });
+        }
+
+        // Populate room filter dropdown in edit mode
+        function populateEditRoomFilter() {
+            const roomSelect = document.getElementById('editRoomFilter');
+            const rooms = [...new Set(editedCourses.map(c => `${c.building} ${c.room}`))].sort();
+
+            roomSelect.innerHTML = '<option value="all">All Rooms</option>';
+            rooms.forEach(room => {
+                if (room.includes('Not specified')) return; // Skip unspecified rooms
+                const option = document.createElement('option');
+                option.value = room;
+                option.textContent = room;
+                roomSelect.appendChild(option);
+            });
+        }
+
+        // Toggle instructor dropdown in edit mode
+        function toggleEditInstructorDropdown() {
+            const dropdown = document.getElementById('editInstructorDropdown');
+            dropdown.style.display = dropdown.style.display === 'block' ? 'none' : 'block';
+        }
+
+        // Toggle single instructor selection in edit mode
+        function toggleEditInstructorSelection(instructor) {
+            if (editSelectedInstructors.has(instructor)) {
+                editSelectedInstructors.delete(instructor);
+            } else {
+                editSelectedInstructors.add(instructor);
+            }
+            updateEditInstructorButtonText();
+            applyEditFilters();
+        }
+
+        // Select all instructors in edit mode
+        function selectAllEditInstructors() {
+            editSelectedInstructors.clear();
+            document.querySelectorAll('#editInstructorList input[type="checkbox"]').forEach(cb => {
+                cb.checked = true;
+            });
+            updateEditInstructorButtonText();
+            applyEditFilters();
+        }
+
+        // Clear all instructors in edit mode
+        function clearAllEditInstructors() {
+            editSelectedInstructors.clear();
+            document.querySelectorAll('#editInstructorList input[type="checkbox"]').forEach(cb => {
+                cb.checked = false;
+                editSelectedInstructors.add(cb.value);
+            });
+            // Start with one instructor selected
+            const firstCheckbox = document.querySelector('#editInstructorList input[type="checkbox"]');
+            if (firstCheckbox) {
+                firstCheckbox.checked = true;
+                editSelectedInstructors.clear();
+                editSelectedInstructors.add(firstCheckbox.value);
+            }
+            updateEditInstructorButtonText();
+            applyEditFilters();
+        }
+
+        // Update instructor button text in edit mode
+        function updateEditInstructorButtonText() {
+            const btnText = document.getElementById('editInstructorBtnText');
+            if (editSelectedInstructors.size === 0) {
+                btnText.textContent = 'All Instructors';
+            } else if (editSelectedInstructors.size === 1) {
+                btnText.textContent = Array.from(editSelectedInstructors)[0];
+            } else {
+                btnText.textContent = `${editSelectedInstructors.size} Instructors`;
+            }
+        }
+
+        // Apply edit mode filters
+        function applyEditFilters() {
+            editRoomFilter = document.getElementById('editRoomFilter').value;
+
+            // Update status text
+            let statusParts = [];
+
+            if (editRoomFilter !== 'all') {
+                statusParts.push(`Room: <strong>${editRoomFilter}</strong>`);
+            }
+
+            if (editSelectedInstructors.size === 0) {
+                statusParts.push('<strong>all instructors</strong>');
+            } else if (editSelectedInstructors.size === 1) {
+                statusParts.push(Array.from(editSelectedInstructors)[0]);
+            } else {
+                statusParts.push(`<strong>${editSelectedInstructors.size} instructors</strong>`);
+            }
+
+            document.getElementById('editFilterStatus').innerHTML = statusParts.join(' | ');
+
+            // Re-render calendar with filters
+            renderEditCalendar();
+        }
+
+        // Close dropdowns when clicking outside
+        document.addEventListener('click', function(event) {
+            const editDropdown = document.getElementById('editInstructorDropdown');
+            const editDropdownBtn = document.getElementById('editInstructorDropdownBtn');
+
+            if (editDropdown && !editDropdownBtn.contains(event.target) && !editDropdown.contains(event.target)) {
+                editDropdown.style.display = 'none';
+            }
+        });
 
         // Populate time picker dropdowns with 10-minute intervals
         function populateTimePickers() {
@@ -1363,10 +1547,19 @@
                 document.getElementById(`edit-${day}`).innerHTML = '';
             });
 
-            // Group courses by day
+            // Group courses by day with filters applied
             const coursesByDay = { monday: [], tuesday: [], wednesday: [], thursday: [], friday: [] };
             editedCourses.forEach(course => {
                 if (!course.days || !course.time) return;
+
+                // Apply instructor filter
+                const instructorMatch = editSelectedInstructors.size === 0 || editSelectedInstructors.has(course.instructor);
+                if (!instructorMatch) return;
+
+                // Apply room filter
+                const courseRoom = `${course.building} ${course.room}`;
+                if (editRoomFilter !== 'all' && courseRoom !== editRoomFilter) return;
+
                 course.days.split('').forEach(dayLetter => {
                     const dayName = dayMap[dayLetter];
                     if (dayName) coursesByDay[dayName].push(course);
@@ -1766,6 +1959,8 @@
 
             editCount++;
             updateEditCount();
+            populateEditInstructorFilter();
+            populateEditRoomFilter();
             renderEditCalendar();
             displayEditModeConflicts();
             populateInstructorDatalist();
@@ -1788,6 +1983,8 @@
                 editedCRNs.delete(crn);
                 editCount++;
                 updateEditCount();
+                populateEditInstructorFilter();
+                populateEditRoomFilter();
                 renderEditCalendar();
                 displayEditModeConflicts();
                 closeEditModal();
@@ -1819,6 +2016,8 @@
             editedCRNs.add(newCRN);
             editCount++;
             updateEditCount();
+            populateEditInstructorFilter();
+            populateEditRoomFilter();
             renderEditCalendar();
             displayEditModeConflicts();
             closeEditModal();
@@ -1986,6 +2185,8 @@
 
                     editCount += imported.length;
                     updateEditCount();
+                    populateEditInstructorFilter();
+                    populateEditRoomFilter();
                     renderEditCalendar();
                     displayEditModeConflicts();
                     populateInstructorDatalist();
@@ -2099,7 +2300,7 @@
         </div>
         <div class="rtd-footer-attribution">
             Credit: Michael Mann, Dept of Geography & Environment<br>
-            Scraped on October 22, 2025 at 12:15 PM | Built with Python & BeautifulSoup
+            Scraped on October 22, 2025 at 01:14 PM | Built with Python & BeautifulSoup
         </div>
     </footer>
 </body>

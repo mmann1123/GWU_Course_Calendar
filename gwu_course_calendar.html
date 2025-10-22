@@ -97,15 +97,18 @@
         .schedule-course-details { font-size: 13px; color: #5f6368; }
 
         /* Room Conflicts */
-        .conflict-group { margin-bottom: 25px; padding: 20px; background-color: #fff3cd; border-radius: 8px; border-left: 4px solid #ff6b6b; }
+        .conflict-group { margin-bottom: 25px; padding: 20px; background-color: #fff3cd; border-radius: 8px; border-left: 4px solid #ff6b6b; position: relative; }
         .conflict-header { font-size: 16px; font-weight: 700; color: #721c24; margin-bottom: 10px; display: flex; align-items: center; gap: 10px; }
         .conflict-severity { display: inline-block; padding: 3px 10px; background-color: #ff6b6b; color: white; border-radius: 12px; font-size: 11px; font-weight: 700; }
+        .conflict-ignore-btn { position: absolute; top: 15px; right: 15px; padding: 6px 12px; background-color: #5f6368; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 12px; font-weight: 600; transition: all 0.2s; }
+        .conflict-ignore-btn:hover { background-color: #3c4043; transform: scale(1.05); }
         .conflict-courses { display: grid; gap: 12px; margin-top: 15px; }
         .conflict-course-item { padding: 12px 15px; background-color: white; border-radius: 6px; border-left: 3px solid #ff6b6b; }
         .conflict-course-header { font-weight: 600; color: #202124; margin-bottom: 5px; }
         .conflict-course-details { font-size: 13px; color: #5f6368; }
         .no-conflicts { padding: 30px; text-align: center; color: #5f6368; font-size: 16px; }
         .conflict-indicator { border: 3px solid #ff6b6b !important; box-shadow: 0 0 0 3px rgba(255,107,107,0.2) !important; }
+        .conflict-hidden { display: none; }
     </style>
 </head>
 <body>
@@ -790,7 +793,8 @@
             </div>`;
 
             conflicts.forEach((conflict, index) => {
-                html += `<div class="conflict-group">
+                html += `<div class="conflict-group" id="conflict-${index}">
+                    <button class="conflict-ignore-btn" onclick="ignoreConflict(${index})">✕ Ignore</button>
                     <div class="conflict-header">
                         <span>📍 ${conflict.room}</span>
                         <span class="conflict-severity">${conflict.courses.length} COURSES</span>
@@ -815,6 +819,13 @@
             });
 
             container.innerHTML = html;
+        }
+
+        function ignoreConflict(conflictIndex) {
+            const conflictElement = document.getElementById(`conflict-${conflictIndex}`);
+            if (conflictElement) {
+                conflictElement.classList.add('conflict-hidden');
+            }
         }
 
         // Planning mode - show instructor schedules

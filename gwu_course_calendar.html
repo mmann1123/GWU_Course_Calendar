@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GWU Courses - Spring 2026</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8f9fa; padding: 20px; }
+        .header { background: linear-gradient(135deg, #1a73e8 0%, #4285f4 100%); color: white; padding: 25px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .header h1 { font-size: 28px; margin-bottom: 8px; }
+        .header p { font-size: 14px; opacity: 0.95; }
+        .stats { background-color: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); display: flex; gap: 40px; }
+        .stats-item { color: #5f6368; font-size: 14px; }
+        .stats-number { font-size: 32px; font-weight: 700; color: #1a73e8; display: block; margin-bottom: 5px; }
+        .calendar-container { background-color: white; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); overflow-x: auto; }
+        .calendar-header { display: grid; grid-template-columns: 80px repeat(5, minmax(180px, 1fr)); border-bottom: 2px solid #e0e0e0; background-color: #f8f9fa; position: sticky; top: 0; z-index: 10; }
+        .day-header { padding: 15px 10px; text-align: center; font-weight: 600; font-size: 14px; color: #3c4043; border-right: 1px solid #e0e0e0; }
+        .day-header:last-child { border-right: none; }
+        .calendar-body { display: grid; grid-template-columns: 80px repeat(5, minmax(180px, 1fr)); position: relative; }
+        .time-column { border-right: 2px solid #e0e0e0; background-color: #fafafa; }
+        .time-slot { height: 60px; padding: 8px; font-size: 12px; font-weight: 500; color: #70757a; text-align: right; border-bottom: 1px solid #f0f0f0; }
+        .day-column { border-right: 1px solid #e0e0e0; position: relative; min-height: 100%; }
+        .day-column:last-child { border-right: none; }
+        .hour-line { position: absolute; width: 100%; height: 1px; background-color: #f0f0f0; left: 0; }
+        .course-block { position: absolute; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 5px; padding: 8px; cursor: pointer; transition: all 0.2s ease; box-shadow: 0 2px 4px rgba(0,0,0,0.15); overflow: hidden; z-index: 1; border: 1px solid rgba(255,255,255,0.3); }
+        .course-block:hover { transform: translateY(-2px) scale(1.02); box-shadow: 0 6px 16px rgba(0,0,0,0.25); z-index: 100; }
+        .course-number { font-weight: 700; color: white; font-size: 11px; margin-bottom: 3px; text-shadow: 0 1px 2px rgba(0,0,0,0.2); }
+        .course-name { color: rgba(255,255,255,0.95); font-size: 10px; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
+        .course-time { color: rgba(255,255,255,0.85); font-size: 9px; margin-top: 4px; font-weight: 600; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); z-index: 1000; animation: fadeIn 0.2s; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .modal-content { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background-color: white; border-radius: 12px; padding: 30px; max-width: 550px; width: 90%; max-height: 85vh; overflow-y: auto; box-shadow: 0 10px 40px rgba(0,0,0,0.3); animation: slideIn 0.3s; }
+        @keyframes slideIn { from { transform: translate(-50%, -60%); opacity: 0; } to { transform: translate(-50%, -50%); opacity: 1; } }
+        .modal-header { margin-bottom: 25px; padding-bottom: 20px; border-bottom: 2px solid #e0e0e0; }
+        .status-badge { display: inline-block; padding: 5px 12px; border-radius: 5px; font-size: 12px; font-weight: 600; margin-bottom: 12px; }
+        .status-open { background-color: #d4edda; color: #155724; }
+        .status-closed, .status-waitlist { background-color: #f8d7da; color: #721c24; }
+        .modal-course-number { font-size: 15px; color: #667eea; font-weight: 700; margin-bottom: 8px; }
+        .modal-course-name { font-size: 22px; font-weight: 700; color: #202124; line-height: 1.3; }
+        .modal-body { margin-bottom: 20px; }
+        .detail-row { display: flex; margin-bottom: 16px; align-items: flex-start; }
+        .detail-label { font-weight: 600; color: #5f6368; min-width: 120px; font-size: 14px; }
+        .detail-value { color: #202124; font-size: 14px; flex: 1; line-height: 1.5; }
+        .close-btn { position: absolute; top: 20px; right: 20px; font-size: 28px; color: #5f6368; cursor: pointer; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 50%; transition: background-color 0.2s; }
+        .close-btn:hover { background-color: #f1f3f4; }
+        .legend { margin-top: 20px; padding: 20px; background-color: white; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .legend-title { font-weight: 700; margin-bottom: 12px; color: #202124; font-size: 16px; }
+        .legend-item { display: block; margin-bottom: 8px; font-size: 13px; color: #5f6368; line-height: 1.6; }
+        .color-box { display: inline-block; width: 18px; height: 18px; border-radius: 4px; margin-right: 8px; vertical-align: middle; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🗓️ GWU Courses - Spring 2026</h1>
+        <p>Interactive Course Schedule | Scraped from GWU website on October 21, 2025</p>
+    </div>
+
+    <div class="stats">
+        <div class="stats-item"><span class="stats-number" id="totalCourses">0</span><span>Total Courses</span></div>
+        <div class="stats-item"><span class="stats-number" id="totalInstructors">0</span><span>Instructors</span></div>
+    </div>
+
+    <div class="calendar-container">
+        <div class="calendar-header">
+            <div class="day-header" style="background-color: white;"></div>
+            <div class="day-header">Monday</div>
+            <div class="day-header">Tuesday</div>
+            <div class="day-header">Wednesday</div>
+            <div class="day-header">Thursday</div>
+            <div class="day-header">Friday</div>
+        </div>
+
+        <div class="calendar-body">
+            <div class="time-column" id="timeColumn"></div>
+            <div class="day-column" id="monday"></div>
+            <div class="day-column" id="tuesday"></div>
+            <div class="day-column" id="wednesday"></div>
+            <div class="day-column" id="thursday"></div>
+            <div class="day-column" id="friday"></div>
+        </div>
+    </div>
+
+    <div class="legend">
+        <div class="legend-title">📋 How to Use</div>
+        <div class="legend-item"><span class="color-box"></span><strong>Click</strong> any course to view details (CRN, instructor, location)</div>
+        <div class="legend-item">• <strong>Overlapping courses</strong> are displayed side-by-side</div>
+        <div class="legend-item">• <strong>Hover</strong> over courses for better visibility</div>
+    </div>
+
+    <div id="modal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn" onclick="closeModal()">&times;</span>
+            <div class="modal-header">
+                <div id="statusBadge"></div>
+                <div class="modal-course-number" id="modalCourseNumber"></div>
+                <div class="modal-course-name" id="modalCourseName"></div>
+            </div>
+            <div class="modal-body">
+                <div class="detail-row"><div class="detail-label">CRN:</div><div class="detail-value" id="modalCRN"></div></div>
+                <div class="detail-row"><div class="detail-label">Instructor:</div><div class="detail-value" id="modalInstructor"></div></div>
+                <div class="detail-row"><div class="detail-label">Meeting Time:</div><div class="detail-value" id="modalTime"></div></div>
+                <div class="detail-row"><div class="detail-label">Days:</div><div class="detail-value" id="modalDays"></div></div>
+                <div class="detail-row"><div class="detail-label">Building:</div><div class="detail-value" id="modalBuilding"></div></div>
+                <div class="detail-row"><div class="detail-label">Room:</div><div class="detail-value" id="modalRoom"></div></div>
+                <div class="detail-row"><div class="detail-label">Credits:</div><div class="detail-value" id="modalCredits"></div></div>
+                <div class="detail-row"><div class="detail-label">Semester:</div><div class="detail-value" id="modalDates"></div></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const courses = [{"status": "OPEN", "crn": "46234", "subject": "GEOG", "section": "10", "title": "Introduction to Human Geography", "credits": "3.00", "instructor": "Chacko, E", "days": "TR", "time": {"start": "02:20PM", "end": "03:35PM", "raw": "02:20PM - 03:35PM"}, "dates": "01/12/26 - 04/27/26", "building": "1957", "room": "EB12", "course_number": "GEOG 1001"}, {"status": "OPEN", "crn": "43145", "subject": "GEOG", "section": "10", "title": "Introduction to Physical Geography", "credits": "4.00", "instructor": "Engstrom, R", "days": "MW", "time": {"start": "11:10AM", "end": "12:25PM", "raw": "11:10AM - 12:25PM"}, "dates": "01/12/26 - 04/27/26", "building": "PHILB156", "room": "Not specified", "course_number": "GEOG 1002"}, {"status": "OPEN", "crn": "43788", "subject": "", "section": "30", "title": "Laboratory", "credits": "0.00", "instructor": "Engstrom, R", "days": "T", "time": {"start": "09:00AM", "end": "10:50AM", "raw": "09:00AM - 10:50AM"}, "dates": "01/12/26 - 04/27/26", "building": "SAMS109", "room": "Not specified", "course_number": " 1002"}, {"status": "OPEN", "crn": "43789", "subject": "", "section": "31", "title": "Laboratory", "credits": "0.00", "instructor": "Engstrom, R", "days": "T", "time": {"start": "11:00AM", "end": "12:50PM", "raw": "11:00AM - 12:50PM"}, "dates": "01/12/26 - 04/27/26", "building": "SAMS109", "room": "Not specified", "course_number": " 1002"}, {"status": "OPEN", "crn": "44633", "subject": "", "section": "32", "title": "Laboratory", "credits": "0.00", "instructor": "Engstrom, R", "days": "R", "time": {"start": "09:00AM", "end": "10:50AM", "raw": "09:00AM - 10:50AM"}, "dates": "01/12/26 - 04/27/26", "building": "SAMS109", "room": "Not specified", "course_number": " 1002"}, {"status": "OPEN", "crn": "43790", "subject": "", "section": "33", "title": "Laboratory", "credits": "0.00", "instructor": "Engstrom, R", "days": "R", "time": {"start": "11:00AM", "end": "12:50PM", "raw": "11:00AM - 12:50PM"}, "dates": "01/12/26 - 04/27/26", "building": "SAMS109", "room": "Not specified", "course_number": " 1002"}, {"status": "OPEN", "crn": "45985", "subject": "GEOG", "section": "10", "title": "Society and Environment", "credits": "3.00", "instructor": "McClure, P", "days": "TR", "time": {"start": "12:45PM", "end": "02:00PM", "raw": "12:45PM - 02:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "1957", "room": "EB12", "course_number": "GEOG 1003"}, {"status": "OPEN", "crn": "43457", "subject": "GEOG", "section": "10", "title": "Introduction to Cartography and GIS", "credits": "3.00", "instructor": "McDonald, A", "days": "TR", "time": {"start": "03:45PM", "end": "04:35PM", "raw": "03:45PM - 04:35PM"}, "dates": "01/12/26 - 04/27/26", "building": "COR101A", "room": "Not specified", "course_number": "GEOG 2104"}, {"status": "OPEN", "crn": "45505", "subject": "", "section": "30", "title": "Laboratory", "credits": "0.00", "instructor": "McDonald, A", "days": "W", "time": {"start": "09:00AM", "end": "10:15AM", "raw": "09:00AM - 10:15AM"}, "dates": "01/12/26 - 04/27/26", "building": "SAMS109", "room": "Not specified", "course_number": " 2104"}, {"status": "OPEN", "crn": "45506", "subject": "", "section": "31", "title": "Laboratory", "credits": "0.00", "instructor": "McDonald, A", "days": "W", "time": {"start": "10:30AM", "end": "11:45AM", "raw": "10:30AM - 11:45AM"}, "dates": "01/12/26 - 04/27/26", "building": "SAMS109", "room": "Not specified", "course_number": " 2104"}, {"status": "OPEN", "crn": "45919", "subject": "", "section": "32", "title": "Laboratory", "credits": "0.00", "instructor": "McDonald, A", "days": "F", "time": {"start": "09:00AM", "end": "10:15AM", "raw": "09:00AM - 10:15AM"}, "dates": "01/12/26 - 04/27/26", "building": "SAMS109", "room": "Not specified", "course_number": " 2104"}, {"status": "OPEN", "crn": "45507", "subject": "", "section": "33", "title": "Laboratory", "credits": "0.00", "instructor": "McDonald, A", "days": "F", "time": {"start": "10:30AM", "end": "11:45AM", "raw": "10:30AM - 11:45AM"}, "dates": "01/12/26 - 04/27/26", "building": "SAMS109", "room": "Not specified", "course_number": " 2104"}, {"status": "OPEN", "crn": "44434", "subject": "GEOG", "section": "10", "title": "World Regional Geography", "credits": "3.00", "instructor": "Cullen, D", "days": "TR", "time": {"start": "11:10AM", "end": "12:25PM", "raw": "11:10AM - 12:25PM"}, "dates": "01/12/26 - 04/27/26", "building": "1957", "room": "E113", "course_number": "GEOG 2120"}, {"status": "OPEN", "crn": "44398", "subject": "GEOG", "section": "10", "title": "Population Geography", "credits": "3.00", "instructor": "Gardner, T", "days": "R", "time": {"start": "05:10PM", "end": "07:00PM", "raw": "05:10PM - 07:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "BELL106", "room": "Not specified", "course_number": "GEOG 2127"}, {"status": "OPEN", "crn": "46027", "subject": "GEOG", "section": "10", "title": "Biogeography", "credits": "3.00", "instructor": "Honzak, M", "days": "MW", "time": {"start": "02:20PM", "end": "03:35PM", "raw": "02:20PM - 03:35PM"}, "dates": "01/12/26 - 04/27/26", "building": "TOMP307", "room": "Not specified", "course_number": "GEOG 2129W"}, {"status": "OPEN", "crn": "46235", "subject": "GEOG", "section": "10", "title": "People, Land, and Food", "credits": "3.00", "instructor": "Uyanik, J", "days": "T", "time": {"start": "05:10PM", "end": "07:00PM", "raw": "05:10PM - 07:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "ROME459", "room": "Not specified", "course_number": "GEOG 2133"}, {"status": "OPEN", "crn": "45920", "subject": "GEOG", "section": "10", "title": "Cities and Societies", "credits": "3.00", "instructor": "Fisher, S", "days": "M", "time": {"start": "07:10PM", "end": "09:00PM", "raw": "07:10PM - 09:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "1776", "room": "GC-119", "course_number": "GEOG 2140"}, {"status": "OPEN", "crn": "44746", "subject": "GEOG", "section": "10", "title": "Military Geography", "credits": "3.00", "instructor": "Licari, A", "days": "T", "time": {"start": "05:10PM", "end": "07:00PM", "raw": "05:10PM - 07:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "SEH7040", "room": "Not specified", "course_number": "GEOG 2147"}, {"status": "OPEN", "crn": "45921", "subject": "GEOG", "section": "10", "title": "Economic Geography", "credits": "3.00", "instructor": "Cullen, D", "days": "TR", "time": {"start": "02:20PM", "end": "03:35PM", "raw": "02:20PM - 03:35PM"}, "dates": "01/12/26 - 04/27/26", "building": "MON115", "room": "Not specified", "course_number": "GEOG 2148"}, {"status": "OPEN", "crn": "45020", "subject": "GEOG", "section": "80", "title": "Techniques of Spatial Analysis", "credits": "3.00", "instructor": "Hurley, B", "days": "M", "time": {"start": "05:10PM", "end": "07:00PM", "raw": "05:10PM - 07:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "SAMS109", "room": "Not specified", "course_number": "GEOG 3105"}, {"status": "OPEN", "crn": "44233", "subject": "", "section": "80", "title": "Geospatial Statistics", "credits": "3.00", "instructor": "Hurley, B", "days": "M", "time": {"start": "05:10PM", "end": "07:00PM", "raw": "05:10PM - 07:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "SAMS109", "room": "Not specified", "course_number": " 6305"}, {"status": "OPEN", "crn": "45614", "subject": "GEOG", "section": "80", "title": "Intermediate Geographic Information Systems", "credits": "3.00", "instructor": "O'Brien, M", "days": "M", "time": {"start": "07:10PM", "end": "09:00PM", "raw": "07:10PM - 09:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "ROMEB104", "room": "Not specified", "course_number": "GEOG 3106"}, {"status": "OPEN", "crn": "44634", "subject": "", "section": "80", "title": "Geographic Information Systems II", "credits": "3.00", "instructor": "Hurley, B", "days": "M", "time": {"start": "07:10PM", "end": "09:00PM", "raw": "07:10PM - 09:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "ROMEB104", "room": "Not specified", "course_number": " 6306"}, {"status": "OPEN", "crn": "45758", "subject": "", "section": "81", "title": "Geographical Info Systems II", "credits": "3.00", "instructor": "Hurley, B", "days": "M", "time": {"start": "07:10PM", "end": "09:00PM", "raw": "07:10PM - 09:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "ROMEB104", "room": "Not specified", "course_number": " 6450"}, {"status": "OPEN", "crn": "44885", "subject": "GEOG", "section": "81", "title": "Intermediate Geographic Information Systems", "credits": "3.00", "instructor": "Hurley, B", "days": "M", "time": {"start": "02:10PM", "end": "04:00PM", "raw": "02:10PM - 04:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "SAMS109", "room": "Not specified", "course_number": "GEOG 3106"}, {"status": "OPEN", "crn": "47514", "subject": "", "section": "81", "title": "Geographic Information Systems II", "credits": "3.00", "instructor": "O'Brien, M", "days": "M", "time": {"start": "02:10PM", "end": "04:00PM", "raw": "02:10PM - 04:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "SAMS109", "room": "Not specified", "course_number": " 6306"}, {"status": "OPEN", "crn": "46556", "subject": "GEOG", "section": "10", "title": "Introduction to Remote Sensing", "credits": "3.00", "instructor": "Copenhaver, A", "days": "R", "time": {"start": "07:10PM", "end": "09:00PM", "raw": "07:10PM - 09:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "SAMS109", "room": "Not specified", "course_number": "GEOG 3107"}, {"status": "OPEN", "crn": "46236", "subject": "GEOG", "section": "80", "title": "Geomorphology and Natural Hazards", "credits": "3.00", "instructor": "Streletskiy, D", "days": "MW", "time": {"start": "12:45PM", "end": "02:00PM", "raw": "12:45PM - 02:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "MON110", "room": "Not specified", "course_number": "GEOG 3128"}, {"status": "OPEN", "crn": "47416", "subject": "", "section": "82", "title": "Geomorphology and Nat Hazards", "credits": "3.00", "instructor": "Streletskiy, D", "days": "MW", "time": {"start": "12:45PM", "end": "02:00PM", "raw": "12:45PM - 02:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "MON110", "room": "Not specified", "course_number": " 6293"}, {"status": "OPEN", "crn": "46017", "subject": "GEOG", "section": "10", "title": "Cultural Geography", "credits": "3.00", "instructor": "Uyanik, J", "days": "TR", "time": {"start": "12:45PM", "end": "02:00PM", "raw": "12:45PM - 02:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "TOMP206", "room": "Not specified", "course_number": "GEOG 3145"}, {"status": "OPEN", "crn": "45422", "subject": "GEOG", "section": "10", "title": "Environmental Law and Policy", "credits": "3.00", "instructor": "Squire, D", "days": "TR", "time": {"start": "11:10AM", "end": "12:25PM", "raw": "11:10AM - 12:25PM"}, "dates": "01/12/26 - 04/27/26", "building": "BELL104", "room": "Not specified", "course_number": "GEOG 3193"}, {"status": "OPEN", "crn": "48244", "subject": "GEOG", "section": "10", "title": "Climatic Change", "credits": "3.00", "instructor": "Streletskiy, D", "days": "MW", "time": {"start": "12:45PM", "end": "02:00PM", "raw": "12:45PM - 02:00PM"}, "dates": "01/12/26 - 04/27/26", "building": "1957", "room": "E111", "course_number": "GEOG 3194"}];
+        const dayMap = { 'M': 'monday', 'T': 'tuesday', 'W': 'wednesday', 'R': 'thursday', 'F': 'friday' };
+
+        function timeToMinutes(timeStr) {
+            const match = timeStr.match(/(\d{1,2}):(\d{2})([AP]M)/);
+            if (!match) return 0;
+            let hours = parseInt(match[1]);
+            const minutes = parseInt(match[2]);
+            const period = match[3];
+            if (period === 'PM' && hours !== 12) hours += 12;
+            if (period === 'AM' && hours === 12) hours = 0;
+            return hours * 60 + minutes;
+        }
+
+        function createTimeSlots() {
+            const timeColumn = document.getElementById('timeColumn');
+            const startHour = 9;
+            const endHour = 21;
+            for (let hour = startHour; hour <= endHour; hour++) {
+                const timeSlot = document.createElement('div');
+                timeSlot.className = 'time-slot';
+                const displayHour = hour > 12 ? hour - 12 : (hour === 0 ? 12 : hour);
+                const period = hour >= 12 ? 'PM' : 'AM';
+                timeSlot.textContent = `${displayHour}:00 ${period}`;
+                timeColumn.appendChild(timeSlot);
+            }
+            ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'].forEach(day => {
+                const dayColumn = document.getElementById(day);
+                for (let i = 0; i <= endHour - startHour; i++) {
+                    const line = document.createElement('div');
+                    line.className = 'hour-line';
+                    line.style.top = `${i * 60}px`;
+                    dayColumn.appendChild(line);
+                }
+            });
+        }
+
+        function renderCourses() {
+            const startHour = 9;
+            const pixelsPerMinute = 1;
+            document.getElementById('totalCourses').textContent = courses.length;
+            const instructors = new Set(courses.map(c => c.instructor));
+            document.getElementById('totalInstructors').textContent = instructors.size;
+            const coursesByDay = { monday: [], tuesday: [], wednesday: [], thursday: [], friday: [] };
+            courses.forEach(course => {
+                course.days.split('').forEach(day => {
+                    const dayId = dayMap[day];
+                    if (dayId) coursesByDay[dayId].push(course);
+                });
+            });
+            Object.keys(coursesByDay).forEach(dayId => {
+                const dayColumn = document.getElementById(dayId);
+                const coursesForDay = coursesByDay[dayId];
+                coursesForDay.sort((a, b) => timeToMinutes(a.time.start) - timeToMinutes(b.time.start));
+                const processed = new Set();
+                coursesForDay.forEach((course, index) => {
+                    if (processed.has(index)) return;
+                    const startMinutes = timeToMinutes(course.time.start);
+                    const endMinutes = timeToMinutes(course.time.end);
+                    const duration = endMinutes - startMinutes;
+                    const topPosition = (startMinutes - (startHour * 60)) * pixelsPerMinute;
+                    const height = duration * pixelsPerMinute;
+                    const overlapping = [];
+                    for (let i = index + 1; i < coursesForDay.length; i++) {
+                        if (processed.has(i)) continue;
+                        const other = coursesForDay[i];
+                        const otherStart = timeToMinutes(other.time.start);
+                        const otherEnd = timeToMinutes(other.time.end);
+                        if (startMinutes < otherEnd && endMinutes > otherStart) {
+                            overlapping.push({course: other, index: i});
+                        }
+                    }
+                    const totalOverlapping = overlapping.length + 1;
+                    const widthPercent = 100 / totalOverlapping;
+                    renderCourseBlock(course, dayColumn, topPosition, height, 0, widthPercent);
+                    processed.add(index);
+                    overlapping.forEach((item, i) => {
+                        const otherStartMinutes = timeToMinutes(item.course.time.start);
+                        const otherEndMinutes = timeToMinutes(item.course.time.end);
+                        const otherDuration = otherEndMinutes - otherStartMinutes;
+                        const otherTopPosition = (otherStartMinutes - (startHour * 60)) * pixelsPerMinute;
+                        const otherHeight = otherDuration * pixelsPerMinute;
+                        renderCourseBlock(item.course, dayColumn, otherTopPosition, otherHeight, i + 1, widthPercent);
+                        processed.add(item.index);
+                    });
+                });
+            });
+        }
+
+        function renderCourseBlock(course, dayColumn, topPosition, height, column, widthPercent) {
+            const courseBlock = document.createElement('div');
+            courseBlock.className = 'course-block';
+            courseBlock.style.top = `${topPosition}px`;
+            courseBlock.style.height = `${height}px`;
+            courseBlock.style.left = `${column * widthPercent}%`;
+            courseBlock.style.width = `calc(${widthPercent}% - 4px)`;
+            courseBlock.innerHTML = `
+                <div class="course-number">${course.course_number}</div>
+                <div class="course-name">${course.title}</div>
+                <div class="course-time">${course.time.start}</div>
+            `;
+            courseBlock.onclick = () => showModal(course);
+            dayColumn.appendChild(courseBlock);
+        }
+
+        function showModal(course) {
+            const statusBadge = document.getElementById('statusBadge');
+            const statusClass = course.status === 'OPEN' ? 'status-open' : 'status-closed';
+            statusBadge.className = 'status-badge ' + statusClass;
+            statusBadge.textContent = course.status;
+            document.getElementById('modalCourseNumber').textContent = course.course_number;
+            document.getElementById('modalCourseName').textContent = course.title;
+            document.getElementById('modalCRN').textContent = course.crn;
+            document.getElementById('modalInstructor').textContent = course.instructor;
+            document.getElementById('modalTime').textContent = course.time.raw;
+            document.getElementById('modalDays').textContent = expandDays(course.days);
+            document.getElementById('modalBuilding').textContent = course.building;
+            document.getElementById('modalRoom').textContent = course.room;
+            document.getElementById('modalCredits').textContent = course.credits;
+            document.getElementById('modalDates').textContent = course.dates;
+            document.getElementById('modal').style.display = 'block';
+        }
+
+        function closeModal() {
+            document.getElementById('modal').style.display = 'none';
+        }
+
+        function expandDays(days) {
+            const dayNames = { 'M': 'Monday', 'T': 'Tuesday', 'W': 'Wednesday', 'R': 'Thursday', 'F': 'Friday' };
+            return days.split('').map(d => dayNames[d]).join(', ');
+        }
+
+        window.onclick = function(event) {
+            if (event.target === document.getElementById('modal')) closeModal();
+        }
+
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') closeModal();
+        });
+
+        createTimeSlots();
+        renderCourses();
+    </script>
+</body>
+</html>

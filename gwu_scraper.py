@@ -736,6 +736,11 @@ def generate_html_calendar(courses: List[Dict], output_file: str):
             renderCoursesFiltered(filteredCourses);
             updateFilterStatus();
             updateInstructorLegend();
+
+            // If planning mode is active, regenerate it with the filtered instructors
+            if (activeTab === 'planning-mode') {{
+                generatePlanningMode();
+            }}
         }}
 
         function clearCalendar() {{
@@ -1022,9 +1027,20 @@ def generate_html_calendar(courses: List[Dict], output_file: str):
         // Planning mode - show instructor schedules
         function generatePlanningMode() {{
             const container = document.getElementById('planningModeContent');
-            const instructors = [...new Set(courses.map(c => c.instructor))].sort();
+
+            // Respect instructor filtering
+            const allInstructors = [...new Set(courses.map(c => c.instructor))].sort();
+            const instructors = selectedInstructors.size === 0
+                ? allInstructors
+                : allInstructors.filter(inst => selectedInstructors.has(inst));
 
             let html = '';
+
+            if (instructors.length === 0) {{
+                html = '<div class="no-conflicts">📋 No instructors selected. Use the instructor filter above to select instructors to view their schedules.</div>';
+                container.innerHTML = html;
+                return;
+            }}
 
             instructors.forEach(instructor => {{
                 const instructorCourses = courses.filter(c => c.instructor === instructor);

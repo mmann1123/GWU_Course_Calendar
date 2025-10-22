@@ -297,7 +297,9 @@ def generate_html_calendar(courses: List[Dict], output_file: str):
         .legend {{ margin-top: 20px; padding: 20px; background-color: white; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }}
         .legend-title {{ font-weight: 700; margin-bottom: 12px; color: #202124; font-size: 16px; }}
         .legend-item {{ display: block; margin-bottom: 8px; font-size: 13px; color: #5f6368; line-height: 1.6; }}
-        .color-box {{ display: inline-block; width: 18px; height: 18px; border-radius: 4px; margin-right: 8px; vertical-align: middle; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }}
+        .legend-grid {{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px 20px; margin-top: 15px; }}
+        .legend-grid-item {{ display: flex; align-items: center; font-size: 13px; color: #202124; }}
+        .color-box {{ display: inline-block; width: 18px; height: 18px; border-radius: 4px; margin-right: 8px; vertical-align: middle; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); flex-shrink: 0; }}
 
         /* Tabs */
         .tabs-container {{ background-color: white; padding: 10px 20px; margin-bottom: 10px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); display: flex; gap: 10px; }}
@@ -418,15 +420,6 @@ def generate_html_calendar(courses: List[Dict], output_file: str):
             <p class="tab-description">Courses scheduled in the same room at overlapping times</p>
             <div id="conflictsContent"></div>
         </div>
-    </div>
-
-    <div class="legend">
-        <div class="legend-title">📋 How to Use</div>
-        <div class="legend-item"><span class="color-box"></span><strong>Hover</strong> over any course to see details in a tooltip</div>
-        <div class="legend-item">• <strong>Click</strong> any course to view full details in a modal</div>
-        <div class="legend-item">• <strong>Click</strong> a day header (Monday-Friday) to filter and show only that day</div>
-        <div class="legend-item">• <strong>Click "Show All Days"</strong> to reset the filter</div>
-        <div class="legend-item">• <strong>Overlapping courses</strong> are displayed side-by-side</div>
     </div>
 
     <div id="modal" class="modal">
@@ -844,11 +837,12 @@ def generate_html_calendar(courses: List[Dict], output_file: str):
                 ? [...new Set(courses.map(c => c.instructor))].sort()
                 : Array.from(selectedInstructors).sort();
 
-            let html = '<div class="legend-title">👥 Instructor Color Key</div>';
+            let html = '<div class="legend-title">👥 Instructor Color Key</div><div class="legend-grid">';
             instructorsToShow.forEach(instructor => {{
                 const color = getInstructorColor(instructor);
-                html += `<div class="legend-item"><span class="color-box" style="background: ${{color}}"></span>${{instructor}}</div>`;
+                html += `<div class="legend-grid-item"><span class="color-box" style="background: ${{color}}"></span><span>${{instructor}}</span></div>`;
             }});
+            html += '</div>';
             legend.innerHTML = html;
         }}
 

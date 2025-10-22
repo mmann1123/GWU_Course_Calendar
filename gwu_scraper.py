@@ -407,7 +407,7 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
         .instructor-checkbox-item label {{ cursor: pointer; font-size: 13px; color: #202124; flex: 1; display: flex; align-items: center; gap: 10px; font-weight: 500; }}
         .instructor-color-indicator {{ display: inline-block; width: 14px; height: 14px; border-radius: 50%; border: 2px solid white; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }}
 
-        /* Planning Mode */
+        /* Class List */
         .planning-container, .conflicts-container {{ background-color: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }}
         .planning-container h2, .conflicts-container h2 {{ color: #202124; margin-bottom: 10px; font-size: 24px; }}
         .tab-description {{ color: #5f6368; margin-bottom: 25px; font-size: 14px; }}
@@ -467,7 +467,7 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
 
     <div class="tabs-container">
         <button class="tab-btn active" data-tab="all-courses" onclick="switchTab('all-courses')">📅 All Courses</button>
-        <button class="tab-btn" data-tab="planning-mode" onclick="switchTab('planning-mode')">👥 Planning Mode</button>
+        <button class="tab-btn" data-tab="planning-mode" onclick="switchTab('planning-mode')">📋 Class List</button>
         <button class="tab-btn" data-tab="room-conflicts" onclick="switchTab('room-conflicts')">⚠️ Room Conflicts</button>
     </div>
 
@@ -517,7 +517,7 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
 
     <div class="tab-content" id="planning-mode-tab" style="display: none;">
         <div class="planning-container">
-            <h2>Planning Mode - Instructor Schedules</h2>
+            <h2>Class List - Instructor Schedules</h2>
             <p class="tab-description">View individual instructor schedules and identify potential conflicts</p>
             <div id="planningModeContent"></div>
         </div>
@@ -845,7 +845,7 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
             updateFilterStatus();
             updateInstructorLegend();
 
-            // If planning mode is active, regenerate it with the filtered instructors
+            // If class list is active, regenerate it with the filtered instructors
             if (activeTab === 'planning-mode') {{
                 generatePlanningMode();
             }}
@@ -1218,7 +1218,7 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
             }}
         }}
 
-        // Planning mode - show instructor schedules
+        // Class list - show instructor schedules
         function generatePlanningMode() {{
             const container = document.getElementById('planningModeContent');
 

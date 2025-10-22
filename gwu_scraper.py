@@ -19,6 +19,13 @@ class CourseScraper:
         self.url = url
         self.text_content = text_content
         self.courses = []
+
+    def detect_total_pages(self, html_content: str) -> int:
+        """Detect total number of pages from pagination links"""
+        page_nums = re.findall(r"goToPage\('(\d+)'\)", html_content)
+        if page_nums:
+            return max(map(int, page_nums))
+        return 1
         
     def parse_time(self, time_str: str) -> Optional[Dict[str, str]]:
         """Parse time string like '02:20PM - 03:35PM'"""
@@ -43,45 +50,9 @@ class CourseScraper:
         days = ''.join(c for c in days_str.strip() if c in 'MTWRF')
         return days if days else None
     
-    def scrape(self) -> List[Dict]:
-        """Scrape course data from URL or text content"""
-
-        soup = None
-        if self.text_content:
-            print("Using provided text content")
-            soup = BeautifulSoup(self.text_content, 'html.parser')
-        elif self.url:
-            print(f"Fetching data from: {self.url}")
-            try:
-                headers = {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-                }
-                response = requests.get(self.url, timeout=30, headers=headers)
-                response.raise_for_status()
-                soup = BeautifulSoup(response.text, 'html.parser')
-            except Exception as e:
-                print(f"❌ Error fetching URL: {e}")
-                print("\n" + "="*70)
-                print("💡 THE GWU WEBSITE REQUIRES AUTHENTICATION")
-                print("="*70)
-                print("\n📋 SOLUTION: Save the webpage manually and use --text-file\n")
-                print("Step 1: Open this URL in your browser:")
-                print(f"        {self.url}")
-                print("\nStep 2: Log in to GWU if needed")
-                print("\nStep 3: Save the page:")
-                print("        Windows: Press Ctrl+S")
-                print("        Mac: Press Cmd+S")
-                print("        Save as: gwu_courses.html")
-                print("\nStep 4: Run the scraper with your saved file:")
-                print("        python gwu_scraper.py --text-file gwu_courses.html")
-                print("\n" + "="*70)
-                print("📄 See CANT_ACCESS_WEBSITE.md for detailed instructions")
-                print("="*70)
-                print("\n✅ GOOD NEWS: gwu_course_calendar.html is already generated!")
-                print("   Just open that file in your browser to view the calendar.\n")
-                return []
-        else:
-            raise ValueError("Must provide either URL or text content")
+    def parse_page_html(self, soup: BeautifulSoup, page_num: int = 1) -> int:
+        """Parse a single page of HTML and add courses to self.courses. Returns number of courses found."""
+        courses_found = 0
 
         # Parse HTML tables - GWU uses table structure with class="courseListing"
         course_tables = soup.find_all('table', class_='courseListing')
@@ -170,16 +141,87 @@ class CourseScraper:
                     }
 
                     self.courses.append(course)
+                    courses_found += 1
                     print(f"✓ {course['course_number']}: {course['title'][:45]}... ({course['days']} {course['time']['raw']}) [CRN: {crn}]")
 
                 except Exception as e:
                     # Skip rows that don't match expected format
                     continue
 
-        print(f"\n{'='*70}")
-        print(f"✅ Total courses scraped: {len(self.courses)}")
-        print(f"{'='*70}")
-        return self.courses
+        return courses_found
+
+    def scrape(self) -> List[Dict]:
+        """Scrape course data from URL or text content"""
+
+        if self.text_content:
+            print("Using provided text content")
+            soup = BeautifulSoup(self.text_content, 'html.parser')
+            self.parse_page_html(soup)
+            print(f"\n{'='*70}")
+            print(f"✅ Total courses scraped: {len(self.courses)}")
+            print(f"{'='*70}")
+            return self.courses
+
+        elif self.url:
+            print(f"Fetching data from: {self.url}")
+            try:
+                headers = {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                }
+
+                # Fetch first page
+                response = requests.get(self.url, timeout=30, headers=headers)
+                response.raise_for_status()
+
+                # Detect total pages
+                total_pages = self.detect_total_pages(response.text)
+                if total_pages > 1:
+                    print(f"📄 Found {total_pages} pages of results")
+
+                # Parse first page
+                soup = BeautifulSoup(response.text, 'html.parser')
+                count = self.parse_page_html(soup, page_num=1)
+                if total_pages > 1:
+                    print(f"   → Page 1: {count} courses")
+
+                # Fetch remaining pages
+                for page_num in range(2, total_pages + 1):
+                    page_url = f"{self.url}&pageNum={page_num}"
+                    print(f"\nFetching page {page_num}...")
+                    response = requests.get(page_url, timeout=30, headers=headers)
+                    response.raise_for_status()
+                    soup = BeautifulSoup(response.text, 'html.parser')
+                    count = self.parse_page_html(soup, page_num=page_num)
+                    print(f"   → Page {page_num}: {count} courses")
+
+                print(f"\n{'='*70}")
+                print(f"✅ Total courses scraped: {len(self.courses)}")
+                print(f"{'='*70}")
+                return self.courses
+
+            except Exception as e:
+                print(f"❌ Error fetching URL: {e}")
+                print("\n" + "="*70)
+                print("💡 THE GWU WEBSITE REQUIRES AUTHENTICATION")
+                print("="*70)
+                print("\n📋 SOLUTION: Save the webpage manually and use --text-file\n")
+                print("Step 1: Open this URL in your browser:")
+                print(f"        {self.url}")
+                print("\nStep 2: Log in to GWU if needed")
+                print("\nStep 3: Save the page:")
+                print("        Windows: Press Ctrl+S")
+                print("        Mac: Press Cmd+S")
+                print("        Save as: gwu_courses.html")
+                print("\nStep 4: Run the scraper with your saved file:")
+                print("        python gwu_scraper.py --text-file gwu_courses.html")
+                print("\n" + "="*70)
+                print("📄 See CANT_ACCESS_WEBSITE.md for detailed instructions")
+                print("="*70)
+                print("\n✅ GOOD NEWS: gwu_course_calendar.html is already generated!")
+                print("   Just open that file in your browser to view the calendar.\n")
+                return []
+        else:
+            raise ValueError("Must provide either URL or text content")
     
     def save_to_json(self, filename: str):
         """Save scraped courses to JSON file"""

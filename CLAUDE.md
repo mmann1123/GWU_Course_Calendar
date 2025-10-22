@@ -55,6 +55,9 @@ python gwu_scraper.py --help
 The entire application is in `gwu_scraper.py` with three main components:
 
 1. **CourseScraper class** - Handles web scraping and data extraction
+   - `detect_total_pages()` - Finds number of result pages
+   - `parse_page_html()` - Parses courses from a single page
+   - `scrape()` - Main method that orchestrates pagination
 2. **generate_html_calendar() function** - Creates standalone HTML calendar
 3. **main() function** - CLI argument parsing and orchestration
 
@@ -96,13 +99,29 @@ Each course is represented as a dictionary:
 
 ## Parsing Strategy
 
-### HTML Table Parsing
+### HTML Table Parsing with Pagination
 
-The scraper uses BeautifulSoup to parse HTML tables with class `courseListing`:
+The scraper automatically handles multi-page results:
 
-1. **Find course tables**: `soup.find_all('table', class_='courseListing')`
-2. **Find course rows**: Rows with class containing `crseRow1`
-3. **Extract from cells**: Each `<td>` element contains specific data
+1. **Detect pagination**: Searches for `goToPage('N')` JavaScript calls to find total pages
+2. **Fetch all pages**: Loops through pages using `&pageNum=2`, `&pageNum=3`, etc.
+3. **Parse tables**: For each page, finds tables with class `courseListing`
+4. **Extract rows**: Finds rows with class containing `crseRow1`
+5. **Combine results**: Aggregates courses from all pages into single list
+
+### Pagination Implementation
+
+```python
+# Detect total pages from first page HTML
+total_pages = self.detect_total_pages(response.text)
+
+# Fetch remaining pages
+for page_num in range(2, total_pages + 1):
+    page_url = f"{self.url}&pageNum={page_num}"
+    # Parse and add to courses list
+```
+
+**Example**: GEOG has 3 pages (32 + 31 + 18 = 81 courses total)
 
 ### Table Cell Structure
 
@@ -256,15 +275,17 @@ Raw JSON array of all courses for:
 
 If GWU changes their HTML format, key areas to update:
 
-1. **Table class name** (gwu_scraper.py:87): `soup.find_all('table', class_='courseListing')`
-2. **Row class name** (gwu_scraper.py:91): `class_=lambda x: x and 'crseRow1' in x`
-3. **Cell structure** (gwu_scraper.py:95-122): Adjust cell indices if table columns change
-4. **Subject/course parsing** (gwu_scraper.py:104-114): If nested span/link structure changes
+1. **Pagination detection** (gwu_scraper.py:23-28): Regex pattern `goToPage\('(\d+)'\)`
+2. **Table class name** (gwu_scraper.py:58): `soup.find_all('table', class_='courseListing')`
+3. **Row class name** (gwu_scraper.py:62): `class_=lambda x: x and 'crseRow1' in x`
+4. **Cell structure** (gwu_scraper.py:66-122): Adjust cell indices if table columns change
+5. **Subject/course parsing** (gwu_scraper.py:75-85): If nested span/link structure changes
 
 To debug parsing issues:
 - Save HTML: `wget -O test.html "URL"` or save via browser
 - Inspect table structure in browser DevTools
 - Test with saved file: `python gwu_scraper.py --text-file test.html`
+- Check pagination: Look for "Result Page:" section and `goToPage()` JavaScript calls
 
 ### Adjusting Calendar Appearance
 

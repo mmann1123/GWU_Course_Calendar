@@ -2,6 +2,16 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## ⚠️ IMPORTANT: Semester Notation
+
+**ALWAYS** use this format when referring to semesters:
+
+- **Spring 01** (NOT "Spring (01)" or "Spring semester (01)")
+- **Summer 06** (NOT "Summer (06)" or "Summer semester (06)")
+- **Fall 08** (NOT "Fall (08)" or "Fall semester (08)")
+
+The correct format is: `<Season> <Number>` with NO parentheses and NO extra words like "semester".
+
 ## Project Overview
 
 This is a single-file Python web scraper that fetches GWU course schedule data and generates an interactive HTML calendar with a Google Calendar-style interface. The scraper uses regex-based parsing to extract course information from GWU's course schedule website and creates a standalone HTML file with embedded JavaScript for interactivity.
@@ -17,7 +27,7 @@ python gwu_scraper_gui.py
 
 The GUI provides:
 - Year selection dropdown (current year ± 2)
-- Semester selection (Spring=01, Summer=06, Fall=08)
+- Semester selection (Spring 01, Summer 06, Fall 08)
 - Subject code entry field
 - Output filename customization
 - Real-time progress display
@@ -253,9 +263,9 @@ https://my.gwu.edu/mod/pws/courses.cfm?campId=1&termId=202601&subjId=GEOG
 
 **GUI Semester Mapping:**
 The GUI displays semester codes as:
-- "Spring (01)" → termId ends with 01
-- "Summer (06)" → termId ends with 06
-- "Fall (08)" → termId ends with 08
+- "Spring 01" → termId ends with 01
+- "Summer 06" → termId ends with 06
+- "Fall 08" → termId ends with 08
 
 ### Common Subject Codes
 

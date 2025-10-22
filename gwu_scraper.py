@@ -1614,9 +1614,18 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
         // Populate instructor checkboxes in edit mode
         function populateEditInstructorFilter() {{
             const instructorList = document.getElementById('editInstructorList');
+            instructorList.innerHTML = ''; // Clear existing
             const instructors = [...new Set(editedCourses.map(c => c.instructor))].sort();
 
-            let html = '';
+            // Ensure all instructors have colors
+            instructors.forEach(instructor => {{
+                if (!instructorColors[instructor]) {{
+                    // Generate a color if missing
+                    const hue = Math.floor(Math.random() * 360);
+                    instructorColors[instructor] = `hsl(${{hue}}, 70%, 60%)`;
+                }}
+            }});
+
             instructors.forEach(instructor => {{
                 const checkbox = document.createElement('div');
                 checkbox.className = 'instructor-checkbox';
@@ -1628,7 +1637,7 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
                                value="${{instructor}}"
                                ${{isChecked ? 'checked' : ''}}
                                onchange="toggleEditInstructorSelection('${{instructor}}')">
-                        <span class="color-box" style="background-color: ${{instructorColors[instructor] || '#ccc'}}"></span>
+                        <span class="color-box" style="background-color: ${{instructorColors[instructor]}}"></span>
                         ${{instructor}}
                     </label>
                 `;

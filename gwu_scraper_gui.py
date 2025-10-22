@@ -56,11 +56,11 @@ class ScraperGUI:
         # Semester Selection
         ttk.Label(main_frame, text="Semester:", font=('Arial', 10)).grid(row=2, column=0, sticky=tk.W, pady=5)
         self.semester_var = tk.StringVar()
-        # GWU uses: 01=Spring, 06=Summer, 08=Fall
+        # GWU uses: 01=Spring, 02=Summer, 03=Fall
         semesters = [
             "Spring (01)",
-            "Summer (06)",
-            "Fall (08)"
+            "Summer (02)",
+            "Fall (03)"
         ]
         self.semester_combo = ttk.Combobox(main_frame, textvariable=self.semester_var,
                                            values=semesters, width=20, state='readonly')

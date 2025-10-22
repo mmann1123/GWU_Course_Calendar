@@ -124,8 +124,95 @@ The app creates two files:
 - Click any course for details (CRN, instructor, location, credits)
 - Works offline - no internet needed once created
 
-### 2. `gwu_course_calendar.json`
-Raw course data in JSON format. Useful if you want to analyze the data yourself or import it into other tools.
+---
+
+## Edit Mode (For Department Admins)
+
+The interactive calendar includes a powerful **Edit Mode** for planning and modifying course schedules. This is especially useful for department administrators who need to:
+
+### Features
+
+- **Add New Courses**: Create courses from scratch with all details
+- **Edit Existing Courses**: Modify any course attribute (instructor, time, room, etc.)
+- **Duplicate Courses**: Quickly create new sections based on existing courses
+- **Delete Courses**: Remove courses from the schedule
+- **Visual Editing**: See changes reflected immediately in the calendar
+- **Export to CSV**: Save your edited schedule in a sortable spreadsheet format
+
+### How to Use Edit Mode
+
+1. **Open the calendar HTML file** in your web browser
+2. **Click the "✏️ Edit Schedule" tab** at the top
+3. **Make changes**:
+   - Click "➕ Add New Course" to create a new course
+   - Click any course block to edit its details
+   - Use the "Duplicate" button to create new sections
+   - Use the "Delete" button to remove courses
+
+### Editing Course Details
+
+When you edit a course, you can modify:
+
+- **Subject Code**: Department code (e.g., GEOG, CSCI)
+- **Course Number**: The course identifier (e.g., 1001, 2101)
+- **Section**: Section number (e.g., 10, 11, 12)
+- **CRN**: Course Registration Number
+- **Course Title**: Full name of the course
+- **Credits**: Number of credit hours
+- **Instructor**: Name (Last, F format recommended)
+- **Days**: Use presets (MW, TR, MWF) or select custom days
+- **Time**: Start and end times (10-minute intervals)
+- **Building & Room**: Location information
+- **Dates**: Semester date range
+
+### Smart Day Selection
+
+The editor includes convenient day patterns:
+
+- **MW** - Monday/Wednesday
+- **TR** - Tuesday/Thursday
+- **MWF** - Monday/Wednesday/Friday
+- **MTWRF** - Every weekday
+- **Custom** - Select any combination
+
+<!-- ### Conflict Detection
+
+Edit Mode automatically detects and displays:
+
+- **Room Conflicts**: Multiple courses in the same room at the same time
+- **Instructor Conflicts**: Instructors teaching multiple courses simultaneously
+- **Ignore Option**: You can mark known conflicts as "ignored" (saved to your browser) -->
+
+### Exporting Your Schedule
+
+Click **"📥 Export to CSV"** at the bottom of Edit Mode to:
+
+- Save your edited schedule as a CSV file
+- Data is automatically sorted by instructor, then course number
+- CSV includes all course details in separate columns
+- Open in Excel, Google Sheets, or any spreadsheet software
+
+### CSV Export Format
+
+The exported CSV includes these columns:
+
+```csv
+CRN, Subject, CourseNum, Section, Title, Credits, Instructor, Days, StartTime, EndTime, Building, Room, Dates
+```
+
+### Change Tracking
+
+- The interface shows a counter of unsaved changes
+- Modified courses are marked with a ⚠️ indicator
+- Hover over courses to see details and identify which to edit
+- All changes are stored in the browser (not permanent until exported)
+
+### Tips
+
+- **Duplicate for efficiency**: Creating multiple sections? Edit one course, then duplicate it and change only the section/time/room
+- **Export regularly**: Your edits are only saved when you export to CSV
+- **Use conflict detection**: Review the "⚠️ Conflicts" tab to catch scheduling issues
+- **Sort exports**: CSV exports are pre-sorted by instructor and course number for easy review
 
 ---
 

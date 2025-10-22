@@ -309,26 +309,27 @@
             </div>
 
             <!-- Edit Mode Filters -->
-            <div style="margin: 20px 0; padding: 15px; background-color: #f8f9fa; border-radius: 8px; display: flex; gap: 20px; align-items: center; flex-wrap: wrap;">
-                <div style="display: flex; align-items: center; gap: 10px;">
-                    <label style="font-weight: 600; color: #202124;">View:</label>
-                    <select id="editDayFilter" onchange="applyEditFilters()" style="padding: 6px 12px; border: 1px solid #dadce0; border-radius: 4px; font-size: 14px; cursor: pointer;">
-                        <option value="all">Show All Days</option>
-                        <option value="monday">Monday Only</option>
-                        <option value="tuesday">Tuesday Only</option>
-                        <option value="wednesday">Wednesday Only</option>
-                        <option value="thursday">Thursday Only</option>
-                        <option value="friday">Friday Only</option>
-                    </select>
+            <div class="filter-controls" style="margin: 20px 0;">
+                <span class="filter-text">Room:</span>
+                <select id="editRoomFilter" onchange="applyEditFilters()" style="padding: 6px 12px; border: 1px solid #dadce0; border-radius: 4px; font-size: 14px; cursor: pointer; background-color: white;">
+                    <option value="all">All Rooms</option>
+                </select>
+                <span class="filter-text">|</span>
+                <span class="filter-text">Instructors:</span>
+                <div class="instructor-selector-wrapper">
+                    <button class="filter-btn" id="editInstructorDropdownBtn" onclick="toggleEditInstructorDropdown()">
+                        <span id="editInstructorBtnText">All Instructors</span> ▼
+                    </button>
+                    <div class="instructor-dropdown" id="editInstructorDropdown">
+                        <div class="instructor-dropdown-header">
+                            <button class="dropdown-action-btn" onclick="selectAllEditInstructors()">Select All</button>
+                            <button class="dropdown-action-btn" onclick="clearAllEditInstructors()">Clear All</button>
+                        </div>
+                        <div id="editInstructorList" class="instructor-list"></div>
+                    </div>
                 </div>
-                <div style="display: flex; align-items: center; gap: 10px;">
-                    <label style="font-weight: 600; color: #202124;">Instructor:</label>
-                    <select id="editInstructorFilter" onchange="applyEditFilters()" style="padding: 6px 12px; border: 1px solid #dadce0; border-radius: 4px; font-size: 14px; cursor: pointer;">
-                        <option value="all">All Instructors</option>
-                    </select>
-                </div>
-                <div id="editFilterStatus" style="color: #5f6368; font-size: 14px; margin-left: auto;">
-                    Showing: <strong>all days</strong> | <strong>all instructors</strong>
+                <div id="editFilterStatus" style="color: #5f6368; font-size: 14px; margin-left: 15px;">
+
                 </div>
             </div>
 
@@ -522,8 +523,8 @@
         let ignoredConflicts = new Set(JSON.parse(localStorage.getItem('ignoredConflicts') || '[]'));
         let editIgnoredConflicts = new Set(JSON.parse(localStorage.getItem('editIgnoredConflicts') || '[]'));
         let currentEditCRN = null;
-        let editDayFilter = 'all';
-        let editInstructorFilter = 'all';
+        let editSelectedInstructors = new Set();
+        let editRoomFilter = 'all';
 
         // Generate unique color for each instructor using HSL
         function generateInstructorColors() {
@@ -1298,6 +1299,7 @@
             populateTimePickers();
             populateInstructorDatalist();
             populateEditInstructorFilter();
+            populateEditRoomFilter();
             renderEditCalendar();
             displayEditModeConflicts();
             updateEditCount();
@@ -1308,34 +1310,137 @@
             });
         }
 
-        // Populate instructor filter dropdown in edit mode
+        // Populate instructor checkboxes in edit mode
         function populateEditInstructorFilter() {
-            const instructorSelect = document.getElementById('editInstructorFilter');
+            const instructorList = document.getElementById('editInstructorList');
             const instructors = [...new Set(editedCourses.map(c => c.instructor))].sort();
 
-            // Keep "All Instructors" option, add individual instructors
-            instructorSelect.innerHTML = '<option value="all">All Instructors</option>';
+            let html = '';
             instructors.forEach(instructor => {
-                const option = document.createElement('option');
-                option.value = instructor;
-                option.textContent = instructor;
-                instructorSelect.appendChild(option);
+                const checkbox = document.createElement('div');
+                checkbox.className = 'instructor-checkbox';
+                const isChecked = editSelectedInstructors.size === 0 || editSelectedInstructors.has(instructor);
+                checkbox.innerHTML = `
+                    <label>
+                        <input type="checkbox"
+                               id="edit-instructor-${instructor.replace(/\s+/g, '-')}"
+                               value="${instructor}"
+                               ${isChecked ? 'checked' : ''}
+                               onchange="toggleEditInstructorSelection('${instructor}')">
+                        <span class="color-box" style="background-color: ${instructorColors[instructor] || '#ccc'}"></span>
+                        ${instructor}
+                    </label>
+                `;
+                instructorList.appendChild(checkbox);
             });
+        }
+
+        // Populate room filter dropdown in edit mode
+        function populateEditRoomFilter() {
+            const roomSelect = document.getElementById('editRoomFilter');
+            const rooms = [...new Set(editedCourses.map(c => `${c.building} ${c.room}`))].sort();
+
+            roomSelect.innerHTML = '<option value="all">All Rooms</option>';
+            rooms.forEach(room => {
+                if (room.includes('Not specified')) return; // Skip unspecified rooms
+                const option = document.createElement('option');
+                option.value = room;
+                option.textContent = room;
+                roomSelect.appendChild(option);
+            });
+        }
+
+        // Toggle instructor dropdown in edit mode
+        function toggleEditInstructorDropdown() {
+            const dropdown = document.getElementById('editInstructorDropdown');
+            dropdown.style.display = dropdown.style.display === 'block' ? 'none' : 'block';
+        }
+
+        // Toggle single instructor selection in edit mode
+        function toggleEditInstructorSelection(instructor) {
+            if (editSelectedInstructors.has(instructor)) {
+                editSelectedInstructors.delete(instructor);
+            } else {
+                editSelectedInstructors.add(instructor);
+            }
+            updateEditInstructorButtonText();
+            applyEditFilters();
+        }
+
+        // Select all instructors in edit mode
+        function selectAllEditInstructors() {
+            editSelectedInstructors.clear();
+            document.querySelectorAll('#editInstructorList input[type="checkbox"]').forEach(cb => {
+                cb.checked = true;
+            });
+            updateEditInstructorButtonText();
+            applyEditFilters();
+        }
+
+        // Clear all instructors in edit mode
+        function clearAllEditInstructors() {
+            editSelectedInstructors.clear();
+            document.querySelectorAll('#editInstructorList input[type="checkbox"]').forEach(cb => {
+                cb.checked = false;
+                editSelectedInstructors.add(cb.value);
+            });
+            // Start with one instructor selected
+            const firstCheckbox = document.querySelector('#editInstructorList input[type="checkbox"]');
+            if (firstCheckbox) {
+                firstCheckbox.checked = true;
+                editSelectedInstructors.clear();
+                editSelectedInstructors.add(firstCheckbox.value);
+            }
+            updateEditInstructorButtonText();
+            applyEditFilters();
+        }
+
+        // Update instructor button text in edit mode
+        function updateEditInstructorButtonText() {
+            const btnText = document.getElementById('editInstructorBtnText');
+            if (editSelectedInstructors.size === 0) {
+                btnText.textContent = 'All Instructors';
+            } else if (editSelectedInstructors.size === 1) {
+                btnText.textContent = Array.from(editSelectedInstructors)[0];
+            } else {
+                btnText.textContent = `${editSelectedInstructors.size} Instructors`;
+            }
         }
 
         // Apply edit mode filters
         function applyEditFilters() {
-            editDayFilter = document.getElementById('editDayFilter').value;
-            editInstructorFilter = document.getElementById('editInstructorFilter').value;
+            editRoomFilter = document.getElementById('editRoomFilter').value;
 
             // Update status text
-            const dayText = editDayFilter === 'all' ? 'all days' : editDayFilter;
-            const instructorText = editInstructorFilter === 'all' ? 'all instructors' : editInstructorFilter;
-            document.getElementById('editFilterStatus').innerHTML = `Showing: <strong>${dayText}</strong> | <strong>${instructorText}</strong>`;
+            let statusParts = [];
+
+            if (editRoomFilter !== 'all') {
+                statusParts.push(`Room: <strong>${editRoomFilter}</strong>`);
+            }
+
+            if (editSelectedInstructors.size === 0) {
+                statusParts.push('<strong>all instructors</strong>');
+            } else if (editSelectedInstructors.size === 1) {
+                statusParts.push(Array.from(editSelectedInstructors)[0]);
+            } else {
+                statusParts.push(`<strong>${editSelectedInstructors.size} instructors</strong>`);
+            }
+
+            document.getElementById('editFilterStatus').innerHTML = statusParts.join(' | ');
 
             // Re-render calendar with filters
             renderEditCalendar();
         }
+
+        // Close dropdowns when clicking outside
+        document.addEventListener('click', function(event) {
+            const editDropdown = document.getElementById('editInstructorDropdown');
+            const editDropdownBtn = document.getElementById('editInstructorDropdownBtn');
+
+            if (editDropdown && !editDropdownBtn.contains(event.target) && !editDropdown.contains(event.target)) {
+                editDropdown.style.display = 'none';
+            }
+        });
 
         // Populate time picker dropdowns with 10-minute intervals
         function populateTimePickers() {
@@ -1425,16 +1530,16 @@
                 if (!course.days || !course.time) return;
 
                 // Apply instructor filter
-                if (editInstructorFilter !== 'all' && course.instructor !== editInstructorFilter) return;
+                const instructorMatch = editSelectedInstructors.size === 0 || editSelectedInstructors.has(course.instructor);
+                if (!instructorMatch) return;
+
+                // Apply room filter
+                const courseRoom = `${course.building} ${course.room}`;
+                if (editRoomFilter !== 'all' && courseRoom !== editRoomFilter) return;
 
                 course.days.split('').forEach(dayLetter => {
                     const dayName = dayMap[dayLetter];
-                    if (!dayName) return;
-
-                    // Apply day filter
-                    if (editDayFilter !== 'all' && dayName !== editDayFilter) return;
-
-                    coursesByDay[dayName].push(course);
+                    if (dayName) coursesByDay[dayName].push(course);
                 });
             });
 
@@ -1832,6 +1937,7 @@
             editCount++;
             updateEditCount();
             populateEditInstructorFilter();
+            populateEditRoomFilter();
             renderEditCalendar();
             displayEditModeConflicts();
             populateInstructorDatalist();
@@ -1855,6 +1961,7 @@
                 editCount++;
                 updateEditCount();
                 populateEditInstructorFilter();
+                populateEditRoomFilter();
                 renderEditCalendar();
                 displayEditModeConflicts();
                 closeEditModal();
@@ -1887,6 +1994,7 @@
             editCount++;
             updateEditCount();
             populateEditInstructorFilter();
+            populateEditRoomFilter();
             renderEditCalendar();
             displayEditModeConflicts();
             closeEditModal();
@@ -2055,6 +2163,7 @@
                     editCount += imported.length;
                     updateEditCount();
                     populateEditInstructorFilter();
+                    populateEditRoomFilter();
                     renderEditCalendar();
                     displayEditModeConflicts();
                     populateInstructorDatalist();
@@ -2168,7 +2277,7 @@
         </div>
         <div class="rtd-footer-attribution">
             Credit: Michael Mann, Dept of Geography & Environment<br>
-            Scraped on October 22, 2025 at 12:35 PM | Built with Python & BeautifulSoup
+            Scraped on October 22, 2025 at 12:49 PM | Built with Python & BeautifulSoup
         </div>
     </footer>
 </body>

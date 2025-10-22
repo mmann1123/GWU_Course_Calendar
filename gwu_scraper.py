@@ -1793,13 +1793,16 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
                 roomGroups[roomKey].courses.push(course);
             }});
 
-            // Check for overlaps within each room - DO NOT bundle conflicts
+            // Check for overlaps within each room and group by day/time window
             Object.keys(roomGroups).forEach(roomKey => {{
                 const roomData = roomGroups[roomKey];
                 const roomCourses = roomData.courses;
 
                 if (roomCourses.length < 2) return;
 
+                const conflictGroups = {{}};
+
+                // Find all pairs with overlaps
                 for (let i = 0; i < roomCourses.length; i++) {{
                     for (let j = i + 1; j < roomCourses.length; j++) {{
                         const course1 = roomCourses[i];
@@ -1819,15 +1822,38 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
                         const end2 = timeToMinutes(course2.time.end);
 
                         if (start1 < end2 && end1 > start2) {{
-                            // Found a conflict - create separate entry for each pair
-                            conflicts.push({{
-                                room: roomData.displayName,
-                                sharedDays: sharedDays,
-                                courses: [course1, course2]
-                            }});
+                            // Found overlap - group by room + days + overlapping time window
+                            const overlapStart = Math.max(start1, start2);
+                            const overlapEnd = Math.min(end1, end2);
+                            const daysKey = sharedDays.sort().join('');
+                            const groupKey = `${{roomData.displayName}}_${{daysKey}}_${{overlapStart}}_${{overlapEnd}}`;
+
+                            if (!conflictGroups[groupKey]) {{
+                                conflictGroups[groupKey] = {{
+                                    room: roomData.displayName,
+                                    sharedDays: sharedDays,
+                                    courses: [],
+                                    overlapStart: overlapStart,
+                                    overlapEnd: overlapEnd
+                                }};
+                            }}
+
+                            // Add courses if not already in group
+                            const group = conflictGroups[groupKey];
+                            if (!group.courses.find(c => c.crn === course1.crn)) {{
+                                group.courses.push(course1);
+                            }}
+                            if (!group.courses.find(c => c.crn === course2.crn)) {{
+                                group.courses.push(course2);
+                            }}
                         }}
                     }}
                 }}
+
+                // Add conflict groups to results
+                Object.values(conflictGroups).forEach(group => {{
+                    conflicts.push(group);
+                }});
             }});
 
             return conflicts;

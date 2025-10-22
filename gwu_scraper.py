@@ -1613,9 +1613,11 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
             preset.value = presetMatch ? checkedDays : 'custom';
         }}
 
-        // Render edit calendar
+        // Render edit calendar with overlap detection
         function renderEditCalendar() {{
             const editTimeColumn = document.getElementById('editTimeColumn');
+            const startHour = 9;
+            const pixelsPerMinute = 1;
 
             // Create time slots
             editTimeColumn.innerHTML = '';
@@ -1633,49 +1635,97 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
                 document.getElementById(`edit-${{day}}`).innerHTML = '';
             }});
 
-            // Render courses
+            // Group courses by day
+            const coursesByDay = {{ monday: [], tuesday: [], wednesday: [], thursday: [], friday: [] }};
             editedCourses.forEach(course => {{
                 if (!course.days || !course.time) return;
-
                 course.days.split('').forEach(dayLetter => {{
                     const dayName = dayMap[dayLetter];
-                    if (!dayName) return;
+                    if (dayName) coursesByDay[dayName].push(course);
+                }});
+            }});
 
-                    const dayColumn = document.getElementById(`edit-${{dayName}}`);
-                    const courseBlock = createEditCourseBlock(course);
-                    dayColumn.appendChild(courseBlock);
+            // Render courses with overlap detection
+            Object.keys(coursesByDay).forEach(dayName => {{
+                const dayColumn = document.getElementById(`edit-${{dayName}}`);
+                const coursesForDay = coursesByDay[dayName];
+
+                // Sort by start time
+                coursesForDay.sort((a, b) => timeToMinutes(a.time.start) - timeToMinutes(b.time.start));
+
+                const processed = new Set();
+
+                coursesForDay.forEach((course, index) => {{
+                    if (processed.has(index)) return;
+
+                    const startMinutes = timeToMinutes(course.time.start);
+                    const endMinutes = timeToMinutes(course.time.end);
+                    const duration = endMinutes - startMinutes;
+                    const topPosition = (startMinutes - (startHour * 60)) * pixelsPerMinute;
+                    const height = duration * pixelsPerMinute;
+
+                    // Find overlapping courses
+                    const overlapping = [];
+                    for (let i = index + 1; i < coursesForDay.length; i++) {{
+                        if (processed.has(i)) continue;
+                        const other = coursesForDay[i];
+                        const otherStart = timeToMinutes(other.time.start);
+                        const otherEnd = timeToMinutes(other.time.end);
+                        if (startMinutes < otherEnd && endMinutes > otherStart) {{
+                            overlapping.push({{course: other, index: i}});
+                        }}
+                    }}
+
+                    // Calculate widths and positions
+                    const totalOverlapping = overlapping.length + 1;
+                    const widthPercent = 100 / totalOverlapping;
+
+                    // Render main course
+                    renderEditCourseBlock(course, dayColumn, topPosition, height, 0, widthPercent);
+                    processed.add(index);
+
+                    // Render overlapping courses
+                    overlapping.forEach((item, i) => {{
+                        const otherStartMinutes = timeToMinutes(item.course.time.start);
+                        const otherEndMinutes = timeToMinutes(item.course.time.end);
+                        const otherDuration = otherEndMinutes - otherStartMinutes;
+                        const otherTopPosition = (otherStartMinutes - (startHour * 60)) * pixelsPerMinute;
+                        const otherHeight = otherDuration * pixelsPerMinute;
+                        renderEditCourseBlock(item.course, dayColumn, otherTopPosition, otherHeight, i + 1, widthPercent);
+                        processed.add(item.index);
+                    }});
                 }});
             }});
         }}
 
-        // Create editable course block
-        function createEditCourseBlock(course) {{
+        // Render editable course block with overlap support
+        function renderEditCourseBlock(course, dayColumn, topPosition, height, column, widthPercent) {{
             const block = document.createElement('div');
             block.className = 'course-block';
+
+            // Mark edited courses
             if (editedCRNs.has(course.crn)) {{
                 block.classList.add('edited');
             }}
 
-            const startMinutes = timeToMinutes(course.time.start);
-            const endMinutes = timeToMinutes(course.time.end);
-            const duration = endMinutes - startMinutes;
+            // Position and size
+            block.style.top = `${{topPosition}}px`;
+            block.style.height = `${{height}}px`;
+            block.style.left = `${{column * widthPercent}}%`;
+            block.style.width = `calc(${{widthPercent}}% - 4px)`;
 
-            block.style.top = `${{(startMinutes - 540)}}px`; // 540 = 9 AM in minutes
-            block.style.height = `${{duration}}px`;
-            block.style.left = '5px';
-            block.style.right = '5px';
-            block.style.width = 'calc(100% - 10px)';
+            // Use instructor-specific color
             block.style.background = getInstructorColor(course.instructor);
 
             block.innerHTML = `
                 <div class="course-number">${{course.course_number}}</div>
                 <div class="course-name">${{course.title}}</div>
-                <div class="course-time">${{course.time.raw}}</div>
+                <div class="course-time">${{course.time.start}}</div>
             `;
 
             block.onclick = () => openEditCourseModal(course);
 
-            return block;
+            dayColumn.appendChild(block);
         }}
 
         // Open modal to add new course

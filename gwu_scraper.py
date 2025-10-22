@@ -535,7 +535,7 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
         <button class="tab-btn" data-tab="edit-schedule" onclick="switchTab('edit-schedule')">✏️ Edit Schedule</button>
     </div>
 
-    <div class="filter-controls">
+    <div class="filter-controls" id="mainCalendarFilters">
         <span class="filter-text">View:</span>
         <button class="filter-btn" onclick="showAllDays()">Show All Days</button>
         <span class="filter-text">|</span>
@@ -861,6 +861,12 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
                 content.style.display = 'none';
             }});
             document.getElementById(tabName + '-tab').style.display = 'block';
+
+            // Show/hide main calendar filters (hide in edit mode, show otherwise)
+            const mainFilters = document.getElementById('mainCalendarFilters');
+            if (mainFilters) {{
+                mainFilters.style.display = tabName === 'edit-schedule' ? 'none' : 'flex';
+            }}
 
             // Load tab-specific content
             if (tabName === 'planning-mode') {{

@@ -234,7 +234,7 @@
         <button class="tab-btn" data-tab="edit-schedule" onclick="switchTab('edit-schedule')">✏️ Edit Schedule</button>
     </div>
 
-    <div class="filter-controls">
+    <div class="filter-controls" id="mainCalendarFilters">
         <span class="filter-text">View:</span>
         <button class="filter-btn" onclick="showAllDays()">Show All Days</button>
         <span class="filter-text">|</span>
@@ -560,6 +560,12 @@
                 content.style.display = 'none';
             });
             document.getElementById(tabName + '-tab').style.display = 'block';
+
+            // Show/hide main calendar filters (hide in edit mode, show otherwise)
+            const mainFilters = document.getElementById('mainCalendarFilters');
+            if (mainFilters) {
+                mainFilters.style.display = tabName === 'edit-schedule' ? 'none' : 'flex';
+            }
 
             // Load tab-specific content
             if (tabName === 'planning-mode') {
@@ -2294,7 +2300,7 @@
         </div>
         <div class="rtd-footer-attribution">
             Credit: Michael Mann, Dept of Geography & Environment<br>
-            Scraped on October 22, 2025 at 01:02 PM | Built with Python & BeautifulSoup
+            Scraped on October 22, 2025 at 01:14 PM | Built with Python & BeautifulSoup
         </div>
     </footer>
 </body>

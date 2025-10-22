@@ -369,12 +369,11 @@
                 <div class="course-name">${course.title}</div>
                 <div class="course-time">${course.time.start}</div>
                 <div class="tooltip">
-                    <div class="tooltip-row"><span class="tooltip-label">CRN:</span><span class="tooltip-value">${course.crn}</span></div>
+                    <div class="tooltip-row"><span class="tooltip-label">Course:</span><span class="tooltip-value">${course.course_number}</span></div>
                     <div class="tooltip-row"><span class="tooltip-label">Instructor:</span><span class="tooltip-value">${course.instructor}</span></div>
                     <div class="tooltip-row"><span class="tooltip-label">Time:</span><span class="tooltip-value">${course.time.raw}</span></div>
                     <div class="tooltip-row"><span class="tooltip-label">Location:</span><span class="tooltip-value">${course.building} ${course.room}</span></div>
-                    <div class="tooltip-row"><span class="tooltip-label">Credits:</span><span class="tooltip-value">${course.credits}</span></div>
-                    <div class="tooltip-row"><span class="tooltip-label">Status:</span><span class="tooltip-value">${course.status}</span></div>
+                    <div class="tooltip-row"><span class="tooltip-label">CRN:</span><span class="tooltip-value">${course.crn}</span></div>
                 </div>
             `;
             courseBlock.onclick = () => showModal(course);

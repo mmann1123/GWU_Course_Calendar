@@ -1721,6 +1721,17 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
                 <div class="course-number">${{course.course_number}}</div>
                 <div class="course-name">${{course.title}}</div>
                 <div class="course-time">${{course.time.start}}</div>
+                <div class="tooltip">
+                    <div class="tooltip-row"><span class="tooltip-label">Course:</span><span class="tooltip-value">${{course.course_number}}</span></div>
+                    <div class="tooltip-row"><span class="tooltip-label">Title:</span><span class="tooltip-value">${{course.title}}</span></div>
+                    <div class="tooltip-row"><span class="tooltip-label">Instructor:</span><span class="tooltip-value">${{course.instructor}}</span></div>
+                    <div class="tooltip-row"><span class="tooltip-label">Time:</span><span class="tooltip-value">${{course.time.raw}}</span></div>
+                    <div class="tooltip-row"><span class="tooltip-label">Room:</span><span class="tooltip-value">${{course.building}} ${{course.room}}</span></div>
+                    <div class="tooltip-row"><span class="tooltip-label">CRN:</span><span class="tooltip-value">${{course.crn}}</span></div>
+                    <div class="tooltip-row"><span class="tooltip-label">Credits:</span><span class="tooltip-value">${{course.credits}}</span></div>
+                    ${{editedCRNs.has(course.crn) ? '<div class="tooltip-row" style="color: #fbbc04; font-weight: 700;">⚠️ Modified</div>' : ''}}
+                    <div class="tooltip-row" style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #555; font-style: italic; color: #aaa;">Click to edit</div>
+                </div>
             `;
 
             block.onclick = () => openEditCourseModal(course);

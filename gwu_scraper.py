@@ -21,6 +21,13 @@ class CourseScraper:
         self.courses = []
         self.courses_by_crn = {}  # Track by CRN for deduplication
 
+        # Extract subject code from URL for fallback
+        self.subject_code = None
+        if url:
+            subject_match = re.search(r'subjId=([A-Z]+)', url)
+            if subject_match:
+                self.subject_code = subject_match.group(1)
+
     def detect_total_pages(self, html_content: str) -> int:
         """Detect total number of pages from pagination links"""
         page_nums = re.findall(r"goToPage\('(\d+)'\)", html_content)
@@ -76,6 +83,10 @@ class CourseScraper:
                     subject_cell = cells[2]
                     subject = subject_cell.find('span', style=lambda x: x and 'font-weight:bold' in x)
                     subject = subject.get_text(strip=True) if subject else ''
+
+                    # Use URL subject code as fallback if subject is empty
+                    if not subject and self.subject_code:
+                        subject = self.subject_code
 
                     # Course number (e.g., 1001, 1002)
                     course_link = subject_cell.find('a')

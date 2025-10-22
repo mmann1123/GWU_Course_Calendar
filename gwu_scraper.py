@@ -642,12 +642,7 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
 
             <!-- Edit Mode Conflicts Section -->
             <div id="editConflictsContainer" style="margin-top: 30px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                    <h3 style="margin: 0; color: #202124;">⚠️ Schedule Conflicts</h3>
-                    <button onclick="resetEditIgnoredConflicts()" style="padding: 6px 12px; background-color: #f1f3f4; border: 1px solid #dadce0; border-radius: 4px; cursor: pointer; font-size: 13px;">
-                        Reset Ignored
-                    </button>
-                </div>
+                <h3 style="margin: 0 0 15px 0; color: #202124;">⚠️ Schedule Conflicts</h3>
                 <div id="editConflictsContent">
                     <div style="padding: 20px; text-align: center; color: #5f6368;">
                         Loading conflicts...
@@ -1773,7 +1768,7 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
             dayColumn.appendChild(block);
         }}
 
-        // Detect conflicts in edited courses
+        // Detect conflicts in edited courses (separate conflicts by specific time/day)
         function detectEditModeConflicts() {{
             const conflicts = [];
             const roomGroups = {{}};
@@ -1798,7 +1793,7 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
                 roomGroups[roomKey].courses.push(course);
             }});
 
-            // Check for overlaps within each room
+            // Check for overlaps within each room - DO NOT bundle conflicts
             Object.keys(roomGroups).forEach(roomKey => {{
                 const roomData = roomGroups[roomKey];
                 const roomCourses = roomData.courses;
@@ -1824,27 +1819,12 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
                         const end2 = timeToMinutes(course2.time.end);
 
                         if (start1 < end2 && end1 > start2) {{
-                            // Found a conflict
-                            const existingConflict = conflicts.find(c =>
-                                c.room === roomData.displayName &&
-                                c.sharedDays.join('') === sharedDays.join('')
-                            );
-
-                            if (existingConflict) {{
-                                // Add to existing conflict group if not already there
-                                if (!existingConflict.courses.find(c => c.crn === course1.crn)) {{
-                                    existingConflict.courses.push(course1);
-                                }}
-                                if (!existingConflict.courses.find(c => c.crn === course2.crn)) {{
-                                    existingConflict.courses.push(course2);
-                                }}
-                            }} else {{
-                                conflicts.push({{
-                                    room: roomData.displayName,
-                                    sharedDays: sharedDays,
-                                    courses: [course1, course2]
-                                }});
-                            }}
+                            // Found a conflict - create separate entry for each pair
+                            conflicts.push({{
+                                room: roomData.displayName,
+                                sharedDays: sharedDays,
+                                courses: [course1, course2]
+                            }});
                         }}
                     }}
                 }}
@@ -1853,19 +1833,19 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
             return conflicts;
         }}
 
-        // Display conflicts in edit mode
+        // Display conflicts in edit mode (using same style as Room Conflicts tab)
         function displayEditModeConflicts() {{
             const conflicts = detectEditModeConflicts();
             const container = document.getElementById('editConflictsContent');
 
             if (conflicts.length === 0) {{
-                container.innerHTML = '<div style="padding: 20px; text-align: center; background-color: #e8f5e9; border-radius: 6px; color: #2e7d32;">✅ No conflicts detected! All courses are scheduled without overlap.</div>';
+                container.innerHTML = '<div class="no-conflicts">✅ No conflicts detected! All courses are scheduled without overlap.</div>';
                 return;
             }}
 
-            let html = `<div style="margin-bottom: 15px; padding: 12px; background-color: #fff3cd; border-left: 4px solid #ff6b6b; border-radius: 6px;">
+            let html = `<div style="margin-bottom: 20px; padding: 15px; background-color: #fff3cd; border-left: 4px solid #ff6b6b; border-radius: 6px;">
                 <strong>⚠️ Found ${{conflicts.length}} conflict${{conflicts.length > 1 ? 's' : ''}}</strong>
-                <p style="margin-top: 5px; margin-bottom: 0; color: #5f6368; font-size: 13px;">The following rooms have multiple courses scheduled at overlapping times:</p>
+                <p style="margin-top: 8px; color: #5f6368; font-size: 14px;">The following rooms have multiple courses scheduled at overlapping times:</p>
             </div>`;
 
             conflicts.forEach((conflict, index) => {{
@@ -1876,32 +1856,42 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
                 const conflictSig = `${{conflict.room}}_${{daysStr}}_${{timeStr}}_${{crns}}`;
                 const isIgnored = editIgnoredConflicts.has(conflictSig);
 
-                html += `<div class="conflict-group${{isIgnored ? ' conflict-hidden' : ''}}" style="margin-bottom: 20px; padding: 15px; background-color: ${{isIgnored ? '#f5f5f5' : 'white'}}; border: 1px solid ${{isIgnored ? '#ddd' : '#ffcdd2'}}; border-radius: 8px; position: relative;">
-                    <button onclick="toggleEditIgnoreConflict('${{conflictSig}}')" style="position: absolute; top: 10px; right: 10px; padding: 4px 10px; background-color: ${{isIgnored ? '#4caf50' : '#f44336'}}; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                html += `<div class="conflict-group${{isIgnored ? ' conflict-hidden' : ''}}" id="edit-conflict-${{index}}" data-signature="${{conflictSig}}">
+                    <button class="conflict-ignore-btn" onclick="toggleEditIgnoreConflict('${{conflictSig}}')">
                         ${{isIgnored ? '↶ Show' : '✕ Ignore'}}
                     </button>
-                    <div style="font-weight: 600; color: #d32f2f; margin-bottom: 8px; display: flex; align-items: center; gap: 10px;">
+                    <div class="conflict-header">
                         <span>📍 ${{conflict.room}}</span>
-                        <span style="padding: 2px 8px; background-color: #d32f2f; color: white; border-radius: 12px; font-size: 11px;">${{conflict.courses.length}} COURSES</span>
-                        ${{isIgnored ? '<span style="font-size: 12px; color: #666; font-weight: normal;">(Ignored)</span>' : ''}}
+                        <span class="conflict-severity">${{conflict.courses.length}} COURSES</span>
+                        ${{isIgnored ? '<span style="margin-left: 10px; font-size: 12px; color: #666;">(Previously Ignored)</span>' : ''}}
                     </div>
-                    <p style="color: #5f6368; font-size: 13px; margin: 8px 0;">Overlapping on: <strong>${{conflict.sharedDays.map(d => ({{'M':'Monday','T':'Tuesday','W':'Wednesday','R':'Thursday','F':'Friday'}}[d])).join(', ')}}</strong></p>
-                    <div style="display: grid; gap: 10px; margin-top: 10px;">`;
+                    <p style="color: #721c24; font-size: 13px; margin: 10px 0;">These courses are scheduled in the same room at overlapping times on <strong>${{conflict.sharedDays.map(d => ({{'M':'Monday','T':'Tuesday','W':'Wednesday','R':'Thursday','F':'Friday'}}[d])).join(', ')}}</strong></p>
+                    <div class="conflict-courses">`;
 
                 conflict.courses.forEach(course => {{
-                    html += `<div style="padding: 10px; background-color: ${{isIgnored ? '#fafafa' : '#fff8e1'}}; border-left: 3px solid #ff6b6b; border-radius: 4px;">
-                        <div style="font-weight: 600; color: #202124; margin-bottom: 4px;">${{course.course_number}} - ${{course.title}}</div>
-                        <div style="font-size: 12px; color: #5f6368;">
+                    const daysExpanded = expandDays(course.days);
+                    html += `<div class="conflict-course-item">
+                        <div class="conflict-course-header">${{course.course_number}} - ${{course.title}}</div>
+                        <div class="conflict-course-details">
                             <strong>CRN:</strong> ${{course.crn}} |
                             <strong>Instructor:</strong> ${{course.instructor}}<br>
                             <strong>Time:</strong> ${{course.time.raw}} |
-                            <strong>Days:</strong> ${{course.days}}
+                            <strong>Days:</strong> ${{daysExpanded}}
                         </div>
                     </div>`;
                 }});
 
                 html += `</div></div>`;
             }});
+
+            // Add reset button if there are ignored conflicts
+            if (editIgnoredConflicts.size > 0) {{
+                html += `<div style="margin-top: 20px; text-align: center;">
+                    <button class="edit-action-btn btn-secondary" onclick="resetEditIgnoredConflicts()">
+                        ↶ Reset All Ignored Conflicts (${{editIgnoredConflicts.size}})
+                    </button>
+                </div>`;
+            }}
 
             container.innerHTML = html;
         }}

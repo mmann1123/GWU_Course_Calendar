@@ -8,7 +8,22 @@ This is a single-file Python web scraper that fetches GWU course schedule data a
 
 ## Common Commands
 
-### Running the Scraper
+### Running the GUI (Recommended)
+
+```bash
+# Launch graphical interface
+python gwu_scraper_gui.py
+```
+
+The GUI provides:
+- Year selection dropdown (current year ± 2)
+- Semester selection (Spring=01, Summer=06, Fall=08)
+- Subject code entry field
+- Output filename customization
+- Real-time progress display
+- Automatic browser launch when complete
+
+### Running the Command-Line Scraper
 
 ```bash
 # Default: Scrape Geography courses for current term
@@ -50,16 +65,27 @@ python gwu_scraper.py --help
 
 ## Architecture
 
-### Single-File Design
+### Two Interfaces
 
-The entire application is in `gwu_scraper.py` with three main components:
+The application has two interfaces sharing the same scraping logic:
 
-1. **CourseScraper class** - Handles web scraping and data extraction
-   - `detect_total_pages()` - Finds number of result pages
-   - `parse_page_html()` - Parses courses from a single page
-   - `scrape()` - Main method that orchestrates pagination
-2. **generate_html_calendar() function** - Creates standalone HTML calendar
-3. **main() function** - CLI argument parsing and orchestration
+**1. Command-Line Interface** (`gwu_scraper.py`):
+- **CourseScraper class** - Handles web scraping and data extraction
+  - `detect_total_pages()` - Finds number of result pages
+  - `parse_page_html()` - Parses courses from a single page
+  - `scrape()` - Main method that orchestrates pagination
+- **generate_html_calendar() function** - Creates standalone HTML calendar
+- **main() function** - CLI argument parsing and orchestration
+
+**2. Graphical Interface** (`gwu_scraper_gui.py`):
+- **ScraperGUI class** - Tkinter-based GUI
+  - `create_widgets()` - Builds the GUI layout
+  - `build_url()` - Constructs URL from dropdown selections
+  - `start_scraping()` - Launches scraper in background thread
+  - `scrape()` - Wrapper that calls CourseScraper and updates UI
+- Imports and reuses `CourseScraper` and `generate_html_calendar()` from CLI version
+- Runs scraping in background thread to keep UI responsive
+- Displays real-time progress and output
 
 ### Data Flow
 
@@ -219,11 +245,17 @@ https://my.gwu.edu/mod/pws/courses.cfm?campId=1&termId=202601&subjId=GEOG
 **Parameters:**
 - `campId=1`: Main campus (usually always 1)
 - `termId=YYYYMM`: Year + month code
-  - `01` = Spring semester
-  - `06` = Summer semester
-  - `08` = Fall semester
+  - `01` = Spring semester (January start)
+  - `06` = Summer semester (June start)
+  - `08` = Fall semester (August start)
   - Example: `202601` = Spring 2026
 - `subjId=XXXX`: Subject code (GEOG, CSCI, MATH, BADM, etc.)
+
+**GUI Semester Mapping:**
+The GUI displays semester codes as:
+- "Spring (01)" → termId ends with 01
+- "Summer (06)" → termId ends with 06
+- "Fall (08)" → termId ends with 08
 
 ### Common Subject Codes
 

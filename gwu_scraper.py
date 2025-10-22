@@ -19,6 +19,7 @@ class CourseScraper:
         self.url = url
         self.text_content = text_content
         self.courses = []
+        self.courses_by_crn = {}  # Track by CRN for deduplication
 
     def detect_total_pages(self, html_content: str) -> int:
         """Detect total number of pages from pagination links"""
@@ -88,7 +89,34 @@ class CourseScraper:
                     title = cells[4].get_text(strip=True)
                     credits = cells[5].get_text(strip=True)
                     instructor = cells[6].get_text(strip=True)
-                    building_room = cells[7].get_text(strip=True)
+
+                    # Parse building/room using HTML structure
+                    # Building is in a link (<a> tag), room is plain text
+                    building = 'Not specified'
+                    room = 'Not specified'
+                    building_room_cell = cells[7]
+
+                    # Try to find building link
+                    building_link = building_room_cell.find('a')
+                    if building_link:
+                        building = building_link.get_text(strip=True)
+                        # Get all text from cell, then remove the building part to get room
+                        full_text = building_room_cell.get_text(strip=True)
+                        # Remove building from full text to get room
+                        room_text = full_text.replace(building, '').strip()
+                        if room_text:
+                            room = room_text
+                    else:
+                        # No link found, fallback to old parsing method
+                        building_room = building_room_cell.get_text(strip=True)
+                        if building_room and building_room != 'Not specified':
+                            parts = building_room.strip().split()
+                            if len(parts) >= 2:
+                                building = ' '.join(parts[:-1])
+                                room = parts[-1]
+                            else:
+                                building = building_room
+
                     day_time = cells[8].get_text(strip=True)
                     dates = cells[9].get_text(strip=True)
 
@@ -112,18 +140,6 @@ class CourseScraper:
                     if not time_info or not days_info:
                         continue
 
-                    # Parse building and room
-                    building = 'Not specified'
-                    room = 'Not specified'
-                    if building_room and building_room != 'Not specified':
-                        # Building/room format: "1957 E B12" or just building code
-                        parts = building_room.strip().split()
-                        if len(parts) >= 2:
-                            building = ' '.join(parts[:-1])
-                            room = parts[-1]
-                        else:
-                            building = building_room
-
                     course = {
                         'status': status,
                         'crn': crn,
@@ -140,9 +156,28 @@ class CourseScraper:
                         'course_number': f"{subject} {course_num}" if course_num else f"{subject} {section}"
                     }
 
-                    self.courses.append(course)
-                    courses_found += 1
-                    print(f"✓ {course['course_number']}: {course['title'][:45]}... ({course['days']} {course['time']['raw']}) [CRN: {crn}]")
+                    # Deduplication: prefer courses with subject code over those without
+                    if crn in self.courses_by_crn:
+                        existing = self.courses_by_crn[crn]
+                        # Always prefer the version with a subject code (GEOG 6306 > 6306)
+                        has_subject_new = bool(subject and subject.strip())
+                        has_subject_existing = bool(existing['subject'] and existing['subject'].strip())
+
+                        if has_subject_new and not has_subject_existing:
+                            # New has subject, existing doesn't - replace
+                            self.courses_by_crn[crn] = course
+                            print(f"✓ {course['course_number']}: {course['title'][:45]}... ({course['days']} {course['time']['raw']}) [CRN: {crn}] (replaced duplicate)")
+                        elif has_subject_existing and not has_subject_new:
+                            # Existing has subject, new doesn't - keep existing
+                            print(f"  ↳ Skipped duplicate CRN {crn}: {course['course_number']} (keeping {existing['course_number']})")
+                        else:
+                            # Both have subject or both don't - keep first one
+                            print(f"  ↳ Skipped duplicate CRN {crn}: {course['course_number']}")
+                    else:
+                        # New CRN, add it
+                        self.courses_by_crn[crn] = course
+                        courses_found += 1
+                        print(f"✓ {course['course_number']}: {course['title'][:45]}... ({course['days']} {course['time']['raw']}) [CRN: {crn}]")
 
                 except Exception as e:
                     # Skip rows that don't match expected format
@@ -157,8 +192,10 @@ class CourseScraper:
             print("Using provided text content")
             soup = BeautifulSoup(self.text_content, 'html.parser')
             self.parse_page_html(soup)
+            # Convert deduplicated courses to list
+            self.courses = list(self.courses_by_crn.values())
             print(f"\n{'='*70}")
-            print(f"✅ Total courses scraped: {len(self.courses)}")
+            print(f"✅ Total courses scraped: {len(self.courses)} (after deduplication)")
             print(f"{'='*70}")
             return self.courses
 
@@ -194,8 +231,10 @@ class CourseScraper:
                     count = self.parse_page_html(soup, page_num=page_num)
                     print(f"   → Page {page_num}: {count} courses")
 
+                # Convert deduplicated courses to list
+                self.courses = list(self.courses_by_crn.values())
                 print(f"\n{'='*70}")
-                print(f"✅ Total courses scraped: {len(self.courses)}")
+                print(f"✅ Total courses scraped: {len(self.courses)} (after deduplication)")
                 print(f"{'='*70}")
                 return self.courses
 
@@ -917,19 +956,41 @@ def generate_html_calendar(courses: List[Dict], output_file: str):
             roomConflicts = [];
             const roomGroups = {{}};
 
+            // Normalize room key for consistent matching
+            function normalizeRoomKey(building, room) {{
+                // Remove extra spaces, convert to uppercase for consistency
+                const normBuilding = building.replace(/\\s+/g, ' ').trim().toUpperCase();
+                const normRoom = room.replace(/\\s+/g, ' ').trim().toUpperCase();
+                return `${{normBuilding}}|${{normRoom}}`;
+            }}
+
             // Group courses by room
             courses.forEach(course => {{
                 if (course.building === 'Not specified' || course.room === 'Not specified') return;
-                const roomKey = `${{course.building}} ${{course.room}}`;
+                const roomKey = normalizeRoomKey(course.building, course.room);
                 if (!roomGroups[roomKey]) {{
-                    roomGroups[roomKey] = [];
+                    roomGroups[roomKey] = {{
+                        displayName: `${{course.building}} ${{course.room}}`,
+                        courses: []
+                    }};
                 }}
-                roomGroups[roomKey].push(course);
+                roomGroups[roomKey].courses.push(course);
             }});
 
             // Check for overlaps within each room
+            console.log(`📋 Checking ${{Object.keys(roomGroups).length}} rooms for conflicts...`);
             Object.keys(roomGroups).forEach(roomKey => {{
-                const roomCourses = roomGroups[roomKey];
+                const roomData = roomGroups[roomKey];
+                const roomCourses = roomData.courses;
+
+                // Log rooms with multiple courses
+                if (roomCourses.length >= 2) {{
+                    console.log(`  Room: ${{roomData.displayName}} has ${{roomCourses.length}} courses`);
+                    roomCourses.forEach(c => {{
+                        console.log(`    - ${{c.course_number}} (${{c.instructor}}) ${{c.days}} ${{c.time.raw}}`);
+                    }});
+                }}
+
                 if (roomCourses.length < 2) return;
 
                 const conflicts = [];
@@ -966,7 +1027,7 @@ def generate_html_calendar(courses: List[Dict], output_file: str):
                                 }}
                             }} else {{
                                 conflicts.push({{
-                                    room: roomKey,
+                                    room: roomData.displayName,
                                     courses: [course1, course2],
                                     sharedDays: sharedDays
                                 }});
@@ -976,6 +1037,15 @@ def generate_html_calendar(courses: List[Dict], output_file: str):
                 }}
 
                 roomConflicts.push(...conflicts);
+            }});
+
+            // Log detected conflicts for debugging
+            console.log(`🔍 Room Conflict Detection: Found ${{roomConflicts.length}} conflict group(s)`);
+            roomConflicts.forEach((conflict, index) => {{
+                console.log(`  Conflict ${{index + 1}}: ${{conflict.room}} - ${{conflict.courses.length}} courses`);
+                conflict.courses.forEach(c => {{
+                    console.log(`    - ${{c.course_number}} (${{c.instructor}}) ${{c.days}} ${{c.time.raw}}`);
+                }});
             }});
 
             return roomConflicts;

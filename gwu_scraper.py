@@ -283,21 +283,22 @@ def generate_html_calendar(courses: List[Dict], output_file: str):
     <style>
         * {{ margin: 0; padding: 0; box-sizing: border-box; }}
         body {{ font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8f9fa; padding: 20px; }}
-        .header {{ background: linear-gradient(135deg, #1a73e8 0%, #4285f4 100%); color: white; padding: 25px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }}
-        .header h1 {{ font-size: 28px; margin-bottom: 8px; }}
-        .header p {{ font-size: 14px; opacity: 0.95; }}
-        .stats {{ background-color: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); display: flex; gap: 40px; }}
-        .stats-item {{ color: #5f6368; font-size: 14px; }}
-        .stats-number {{ font-size: 32px; font-weight: 700; color: #1a73e8; display: block; margin-bottom: 5px; }}
-        .calendar-container {{ background-color: white; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); overflow-x: auto; }}
+        .header {{ background: linear-gradient(135deg, #1a73e8 0%, #4285f4 100%); color: white; padding: 30px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 12px rgba(26,115,232,0.3); }}
+        .header h1 {{ font-size: 30px; margin-bottom: 10px; font-weight: 700; letter-spacing: -0.5px; }}
+        .header p {{ font-size: 14px; opacity: 0.92; font-weight: 400; }}
+        .stats {{ background-color: white; padding: 24px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); display: flex; gap: 50px; }}
+        .stats-item {{ color: #5f6368; font-size: 14px; font-weight: 500; }}
+        .stats-number {{ font-size: 36px; font-weight: 700; background: linear-gradient(135deg, #1a73e8 0%, #4285f4 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; display: block; margin-bottom: 5px; }}
+        .calendar-container {{ background-color: white; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.1); overflow-x: auto; }}
         .calendar-header {{ display: grid; grid-template-columns: 80px repeat(5, minmax(180px, 1fr)); border-bottom: 2px solid #e0e0e0; background-color: #f8f9fa; position: sticky; top: 0; z-index: 10; }}
         .day-header {{ padding: 15px 10px; text-align: center; font-weight: 600; font-size: 14px; color: #3c4043; border-right: 1px solid #e0e0e0; cursor: pointer; transition: all 0.2s ease; }}
         .day-header:hover {{ background-color: #e3f2fd; color: #1a73e8; }}
         .day-header.active {{ background-color: #1a73e8; color: white; }}
         .day-header:last-child {{ border-right: none; }}
-        .filter-controls {{ background-color: white; padding: 15px 20px; margin-bottom: 10px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); display: flex; align-items: center; gap: 15px; }}
-        .filter-btn {{ padding: 8px 16px; border: 1px solid #1a73e8; background-color: white; color: #1a73e8; border-radius: 5px; cursor: pointer; font-size: 13px; font-weight: 600; transition: all 0.2s; }}
-        .filter-btn:hover {{ background-color: #1a73e8; color: white; }}
+        .filter-controls {{ background-color: white; padding: 18px 24px; margin-bottom: 10px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); display: flex; align-items: center; gap: 15px; flex-wrap: wrap; }}
+        .filter-btn {{ padding: 9px 18px; border: 1px solid #1a73e8; background-color: white; color: #1a73e8; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600; transition: all 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }}
+        .filter-btn:hover {{ background-color: #1a73e8; color: white; transform: translateY(-1px); box-shadow: 0 3px 8px rgba(26,115,232,0.25); }}
+        .filter-btn:active {{ transform: translateY(0); }}
         .filter-text {{ color: #5f6368; font-size: 14px; font-weight: 500; }}
         .calendar-body {{ display: grid; grid-template-columns: 80px repeat(5, minmax(180px, 1fr)); position: relative; }}
         .time-column {{ border-right: 2px solid #e0e0e0; background-color: #fafafa; }}
@@ -317,22 +318,27 @@ def generate_html_calendar(courses: List[Dict], output_file: str):
         .course-number {{ font-weight: 700; color: white; font-size: 11px; margin-bottom: 3px; text-shadow: 0 1px 2px rgba(0,0,0,0.2); }}
         .course-name {{ color: rgba(255,255,255,0.95); font-size: 10px; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }}
         .course-time {{ color: rgba(255,255,255,0.85); font-size: 9px; margin-top: 4px; font-weight: 600; }}
-        .modal {{ display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); z-index: 1000; animation: fadeIn 0.2s; }}
+        .modal {{ display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.6); z-index: 1000; animation: fadeIn 0.2s; backdrop-filter: blur(2px); }}
         @keyframes fadeIn {{ from {{ opacity: 0; }} to {{ opacity: 1; }} }}
-        .modal-content {{ position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background-color: white; border-radius: 12px; padding: 30px; max-width: 550px; width: 90%; max-height: 85vh; overflow-y: auto; box-shadow: 0 10px 40px rgba(0,0,0,0.3); animation: slideIn 0.3s; }}
-        @keyframes slideIn {{ from {{ transform: translate(-50%, -60%); opacity: 0; }} to {{ transform: translate(-50%, -50%); opacity: 1; }} }}
-        .modal-header {{ margin-bottom: 25px; padding-bottom: 20px; border-bottom: 2px solid #e0e0e0; }}
-        .status-badge {{ display: inline-block; padding: 5px 12px; border-radius: 5px; font-size: 12px; font-weight: 600; margin-bottom: 12px; }}
-        .status-open {{ background-color: #d4edda; color: #155724; }}
-        .status-closed, .status-waitlist {{ background-color: #f8d7da; color: #721c24; }}
-        .modal-course-number {{ font-size: 15px; color: #667eea; font-weight: 700; margin-bottom: 8px; }}
-        .modal-course-name {{ font-size: 22px; font-weight: 700; color: #202124; line-height: 1.3; }}
+        .modal-content {{ position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background-color: white; border-radius: 16px; padding: 32px; max-width: 580px; width: 90%; max-height: 85vh; overflow-y: auto; box-shadow: 0 12px 48px rgba(0,0,0,0.25), 0 4px 16px rgba(0,0,0,0.12); animation: slideIn 0.3s; }}
+        @keyframes slideIn {{ from {{ transform: translate(-50%, -55%); opacity: 0; }} to {{ transform: translate(-50%, -50%); opacity: 1; }} }}
+        .modal-content::-webkit-scrollbar {{ width: 8px; }}
+        .modal-content::-webkit-scrollbar-track {{ background: #f1f3f4; border-radius: 4px; }}
+        .modal-content::-webkit-scrollbar-thumb {{ background: #dadce0; border-radius: 4px; }}
+        .modal-content::-webkit-scrollbar-thumb:hover {{ background: #bdc1c6; }}
+        .modal-header {{ margin-bottom: 28px; padding-bottom: 24px; border-bottom: 2px solid #e8eaed; }}
+        .status-badge {{ display: inline-block; padding: 6px 14px; border-radius: 8px; font-size: 12px; font-weight: 700; margin-bottom: 14px; text-transform: uppercase; letter-spacing: 0.5px; }}
+        .status-open {{ background: linear-gradient(135deg, #34a853 0%, #0f9d58 100%); color: white; box-shadow: 0 2px 6px rgba(52,168,83,0.3); }}
+        .status-closed, .status-waitlist {{ background: linear-gradient(135deg, #ea4335 0%, #d33b2c 100%); color: white; box-shadow: 0 2px 6px rgba(234,67,53,0.3); }}
+        .modal-course-number {{ font-size: 15px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-weight: 700; margin-bottom: 10px; letter-spacing: 0.3px; }}
+        .modal-course-name {{ font-size: 24px; font-weight: 700; color: #202124; line-height: 1.3; margin-bottom: 4px; }}
         .modal-body {{ margin-bottom: 20px; }}
-        .detail-row {{ display: flex; margin-bottom: 16px; align-items: flex-start; }}
-        .detail-label {{ font-weight: 600; color: #5f6368; min-width: 120px; font-size: 14px; }}
-        .detail-value {{ color: #202124; font-size: 14px; flex: 1; line-height: 1.5; }}
-        .close-btn {{ position: absolute; top: 20px; right: 20px; font-size: 28px; color: #5f6368; cursor: pointer; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 50%; transition: background-color 0.2s; }}
-        .close-btn:hover {{ background-color: #f1f3f4; }}
+        .detail-row {{ display: flex; margin-bottom: 18px; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid #f1f3f4; }}
+        .detail-row:last-child {{ border-bottom: none; }}
+        .detail-label {{ font-weight: 600; color: #5f6368; min-width: 130px; font-size: 14px; }}
+        .detail-value {{ color: #202124; font-size: 14px; flex: 1; line-height: 1.5; font-weight: 500; }}
+        .close-btn {{ position: absolute; top: 24px; right: 24px; font-size: 28px; color: #5f6368; cursor: pointer; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border-radius: 50%; transition: all 0.2s; }}
+        .close-btn:hover {{ background-color: #f1f3f4; transform: scale(1.1); color: #202124; }}
         .legend {{ margin-top: 20px; padding: 20px; background-color: white; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }}
         .legend-title {{ font-weight: 700; margin-bottom: 12px; color: #202124; font-size: 16px; }}
         .legend-item {{ display: block; margin-bottom: 8px; font-size: 13px; color: #5f6368; line-height: 1.6; }}
@@ -341,25 +347,32 @@ def generate_html_calendar(courses: List[Dict], output_file: str):
         .color-box {{ display: inline-block; width: 18px; height: 18px; border-radius: 4px; margin-right: 8px; vertical-align: middle; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); flex-shrink: 0; }}
 
         /* Tabs */
-        .tabs-container {{ background-color: white; padding: 10px 20px; margin-bottom: 10px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); display: flex; gap: 10px; }}
-        .tab-btn {{ padding: 10px 20px; border: none; background-color: #f1f3f4; color: #5f6368; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600; transition: all 0.2s; }}
-        .tab-btn:hover {{ background-color: #e3f2fd; color: #1a73e8; }}
-        .tab-btn.active {{ background-color: #1a73e8; color: white; }}
+        .tabs-container {{ background-color: white; padding: 12px 24px; margin-bottom: 10px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); display: flex; gap: 12px; }}
+        .tab-btn {{ padding: 12px 24px; border: none; background-color: #f1f3f4; color: #5f6368; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600; transition: all 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }}
+        .tab-btn:hover {{ background-color: #e8f0fe; color: #1a73e8; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(0,0,0,0.1); }}
+        .tab-btn:active {{ transform: translateY(0); }}
+        .tab-btn.active {{ background: linear-gradient(135deg, #1a73e8 0%, #4285f4 100%); color: white; box-shadow: 0 3px 8px rgba(26,115,232,0.3); }}
         .tab-content {{ display: block; }}
 
         /* Instructor Selector */
         .instructor-selector-wrapper {{ position: relative; }}
-        .instructor-dropdown {{ display: none; position: absolute; top: 100%; left: 0; background-color: white; border: 1px solid #e0e0e0; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); min-width: 280px; max-width: 400px; z-index: 100; margin-top: 5px; }}
-        .instructor-dropdown.show {{ display: block; }}
-        .instructor-dropdown-header {{ display: flex; justify-content: space-between; padding: 10px; border-bottom: 1px solid #e0e0e0; gap: 8px; }}
-        .dropdown-action-btn {{ padding: 6px 12px; border: 1px solid #1a73e8; background-color: white; color: #1a73e8; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 600; transition: all 0.2s; flex: 1; }}
-        .dropdown-action-btn:hover {{ background-color: #1a73e8; color: white; }}
-        .instructor-list {{ max-height: 300px; overflow-y: auto; padding: 8px; }}
-        .instructor-checkbox-item {{ display: flex; align-items: center; padding: 8px 10px; border-radius: 4px; cursor: pointer; transition: background-color 0.2s; }}
-        .instructor-checkbox-item:hover {{ background-color: #f1f3f4; }}
-        .instructor-checkbox-item input[type="checkbox"] {{ margin-right: 10px; cursor: pointer; width: 16px; height: 16px; }}
-        .instructor-checkbox-item label {{ cursor: pointer; font-size: 13px; color: #202124; flex: 1; display: flex; align-items: center; gap: 8px; }}
-        .instructor-color-indicator {{ display: inline-block; width: 12px; height: 12px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.1); }}
+        .instructor-dropdown {{ display: none; position: absolute; top: 100%; left: 0; background-color: white; border: 1px solid #dadce0; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.12), 0 2px 6px rgba(0,0,0,0.08); min-width: 320px; max-width: 420px; z-index: 100; margin-top: 8px; overflow: hidden; }}
+        .instructor-dropdown.show {{ display: block; animation: dropdownSlide 0.2s ease-out; }}
+        @keyframes dropdownSlide {{ from {{ opacity: 0; transform: translateY(-8px); }} to {{ opacity: 1; transform: translateY(0); }} }}
+        .instructor-dropdown-header {{ display: flex; justify-content: space-between; padding: 12px 16px; background: linear-gradient(135deg, #f8f9fa 0%, #e8eaed 100%); border-bottom: 1px solid #dadce0; gap: 10px; }}
+        .dropdown-action-btn {{ padding: 8px 16px; border: 1px solid #1a73e8; background-color: white; color: #1a73e8; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 600; transition: all 0.2s; flex: 1; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }}
+        .dropdown-action-btn:hover {{ background-color: #1a73e8; color: white; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(26,115,232,0.3); }}
+        .dropdown-action-btn:active {{ transform: translateY(0); }}
+        .instructor-list {{ max-height: 340px; overflow-y: auto; padding: 8px; background-color: #fafafa; }}
+        .instructor-list::-webkit-scrollbar {{ width: 8px; }}
+        .instructor-list::-webkit-scrollbar-track {{ background: #f1f3f4; border-radius: 4px; }}
+        .instructor-list::-webkit-scrollbar-thumb {{ background: #dadce0; border-radius: 4px; }}
+        .instructor-list::-webkit-scrollbar-thumb:hover {{ background: #bdc1c6; }}
+        .instructor-checkbox-item {{ display: flex; align-items: center; padding: 10px 12px; margin-bottom: 4px; border-radius: 8px; cursor: pointer; transition: all 0.2s; background-color: white; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }}
+        .instructor-checkbox-item:hover {{ background-color: #e8f0fe; transform: translateX(4px); box-shadow: 0 2px 6px rgba(26,115,232,0.15); }}
+        .instructor-checkbox-item input[type="checkbox"] {{ margin-right: 12px; cursor: pointer; width: 18px; height: 18px; accent-color: #1a73e8; }}
+        .instructor-checkbox-item label {{ cursor: pointer; font-size: 13px; color: #202124; flex: 1; display: flex; align-items: center; gap: 10px; font-weight: 500; }}
+        .instructor-color-indicator {{ display: inline-block; width: 14px; height: 14px; border-radius: 50%; border: 2px solid white; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }}
 
         /* Planning Mode */
         .planning-container, .conflicts-container {{ background-color: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }}

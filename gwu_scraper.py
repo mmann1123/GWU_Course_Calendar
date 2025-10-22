@@ -298,6 +298,49 @@ def generate_html_calendar(courses: List[Dict], output_file: str):
         .legend-title {{ font-weight: 700; margin-bottom: 12px; color: #202124; font-size: 16px; }}
         .legend-item {{ display: block; margin-bottom: 8px; font-size: 13px; color: #5f6368; line-height: 1.6; }}
         .color-box {{ display: inline-block; width: 18px; height: 18px; border-radius: 4px; margin-right: 8px; vertical-align: middle; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }}
+
+        /* Tabs */
+        .tabs-container {{ background-color: white; padding: 10px 20px; margin-bottom: 10px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); display: flex; gap: 10px; }}
+        .tab-btn {{ padding: 10px 20px; border: none; background-color: #f1f3f4; color: #5f6368; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600; transition: all 0.2s; }}
+        .tab-btn:hover {{ background-color: #e3f2fd; color: #1a73e8; }}
+        .tab-btn.active {{ background-color: #1a73e8; color: white; }}
+        .tab-content {{ display: block; }}
+
+        /* Instructor Selector */
+        .instructor-selector-wrapper {{ position: relative; }}
+        .instructor-dropdown {{ display: none; position: absolute; top: 100%; left: 0; background-color: white; border: 1px solid #e0e0e0; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); min-width: 280px; max-width: 400px; z-index: 100; margin-top: 5px; }}
+        .instructor-dropdown.show {{ display: block; }}
+        .instructor-dropdown-header {{ display: flex; justify-content: space-between; padding: 10px; border-bottom: 1px solid #e0e0e0; gap: 8px; }}
+        .dropdown-action-btn {{ padding: 6px 12px; border: 1px solid #1a73e8; background-color: white; color: #1a73e8; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 600; transition: all 0.2s; flex: 1; }}
+        .dropdown-action-btn:hover {{ background-color: #1a73e8; color: white; }}
+        .instructor-list {{ max-height: 300px; overflow-y: auto; padding: 8px; }}
+        .instructor-checkbox-item {{ display: flex; align-items: center; padding: 8px 10px; border-radius: 4px; cursor: pointer; transition: background-color 0.2s; }}
+        .instructor-checkbox-item:hover {{ background-color: #f1f3f4; }}
+        .instructor-checkbox-item input[type="checkbox"] {{ margin-right: 10px; cursor: pointer; width: 16px; height: 16px; }}
+        .instructor-checkbox-item label {{ cursor: pointer; font-size: 13px; color: #202124; flex: 1; display: flex; align-items: center; gap: 8px; }}
+        .instructor-color-indicator {{ display: inline-block; width: 12px; height: 12px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.1); }}
+
+        /* Planning Mode */
+        .planning-container, .conflicts-container {{ background-color: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }}
+        .planning-container h2, .conflicts-container h2 {{ color: #202124; margin-bottom: 10px; font-size: 24px; }}
+        .tab-description {{ color: #5f6368; margin-bottom: 25px; font-size: 14px; }}
+        .instructor-schedule {{ margin-bottom: 30px; padding: 20px; background-color: #f8f9fa; border-radius: 8px; border-left: 4px solid #1a73e8; }}
+        .instructor-schedule-header {{ font-size: 18px; font-weight: 700; color: #202124; margin-bottom: 15px; display: flex; align-items: center; gap: 10px; }}
+        .instructor-schedule-courses {{ display: grid; gap: 10px; }}
+        .schedule-course-item {{ padding: 12px 15px; background-color: white; border-radius: 6px; border-left: 3px solid #667eea; }}
+        .schedule-course-title {{ font-weight: 600; color: #202124; margin-bottom: 5px; }}
+        .schedule-course-details {{ font-size: 13px; color: #5f6368; }}
+
+        /* Room Conflicts */
+        .conflict-group {{ margin-bottom: 25px; padding: 20px; background-color: #fff3cd; border-radius: 8px; border-left: 4px solid #ff6b6b; }}
+        .conflict-header {{ font-size: 16px; font-weight: 700; color: #721c24; margin-bottom: 10px; display: flex; align-items: center; gap: 10px; }}
+        .conflict-severity {{ display: inline-block; padding: 3px 10px; background-color: #ff6b6b; color: white; border-radius: 12px; font-size: 11px; font-weight: 700; }}
+        .conflict-courses {{ display: grid; gap: 12px; margin-top: 15px; }}
+        .conflict-course-item {{ padding: 12px 15px; background-color: white; border-radius: 6px; border-left: 3px solid #ff6b6b; }}
+        .conflict-course-header {{ font-weight: 600; color: #202124; margin-bottom: 5px; }}
+        .conflict-course-details {{ font-size: 13px; color: #5f6368; }}
+        .no-conflicts {{ padding: 30px; text-align: center; color: #5f6368; font-size: 16px; }}
+        .conflict-indicator {{ border: 3px solid #ff6b6b !important; box-shadow: 0 0 0 3px rgba(255,107,107,0.2) !important; }}
     </style>
 </head>
 <body>
@@ -311,29 +354,69 @@ def generate_html_calendar(courses: List[Dict], output_file: str):
         <div class="stats-item"><span class="stats-number" id="totalInstructors">0</span><span>Instructors</span></div>
     </div>
 
+    <div class="tabs-container">
+        <button class="tab-btn active" data-tab="all-courses" onclick="switchTab('all-courses')">📅 All Courses</button>
+        <button class="tab-btn" data-tab="planning-mode" onclick="switchTab('planning-mode')">👥 Planning Mode</button>
+        <button class="tab-btn" data-tab="room-conflicts" onclick="switchTab('room-conflicts')">⚠️ Room Conflicts</button>
+    </div>
+
     <div class="filter-controls">
         <span class="filter-text">View:</span>
         <button class="filter-btn" onclick="showAllDays()">Show All Days</button>
-        <span class="filter-text" id="filterStatus">Showing all days</span>
+        <span class="filter-text">|</span>
+        <span class="filter-text">Instructors:</span>
+        <div class="instructor-selector-wrapper">
+            <button class="filter-btn" id="instructorDropdownBtn" onclick="toggleInstructorDropdown()">
+                <span id="instructorBtnText">All Instructors</span> ▼
+            </button>
+            <div class="instructor-dropdown" id="instructorDropdown">
+                <div class="instructor-dropdown-header">
+                    <button class="dropdown-action-btn" onclick="selectAllInstructors()">Select All</button>
+                    <button class="dropdown-action-btn" onclick="clearAllInstructors()">Clear All</button>
+                </div>
+                <div class="instructor-list" id="instructorList"></div>
+            </div>
+        </div>
+        <span class="filter-text" id="filterStatus">Showing all days, all instructors</span>
     </div>
 
-    <div class="calendar-container">
-        <div class="calendar-header">
-            <div class="day-header" style="background-color: white; cursor: default;"></div>
-            <div class="day-header" data-day="monday" onclick="filterDay('monday')">Monday</div>
-            <div class="day-header" data-day="tuesday" onclick="filterDay('tuesday')">Tuesday</div>
-            <div class="day-header" data-day="wednesday" onclick="filterDay('wednesday')">Wednesday</div>
-            <div class="day-header" data-day="thursday" onclick="filterDay('thursday')">Thursday</div>
-            <div class="day-header" data-day="friday" onclick="filterDay('friday')">Friday</div>
+    <div class="tab-content" id="all-courses-tab">
+        <div class="calendar-container">
+            <div class="calendar-header">
+                <div class="day-header" style="background-color: white; cursor: default;"></div>
+                <div class="day-header" data-day="monday" onclick="filterDay('monday')">Monday</div>
+                <div class="day-header" data-day="tuesday" onclick="filterDay('tuesday')">Tuesday</div>
+                <div class="day-header" data-day="wednesday" onclick="filterDay('wednesday')">Wednesday</div>
+                <div class="day-header" data-day="thursday" onclick="filterDay('thursday')">Thursday</div>
+                <div class="day-header" data-day="friday" onclick="filterDay('friday')">Friday</div>
+            </div>
+
+            <div class="calendar-body">
+                <div class="time-column" id="timeColumn"></div>
+                <div class="day-column" id="monday"></div>
+                <div class="day-column" id="tuesday"></div>
+                <div class="day-column" id="wednesday"></div>
+                <div class="day-column" id="thursday"></div>
+                <div class="day-column" id="friday"></div>
+            </div>
         </div>
 
-        <div class="calendar-body">
-            <div class="time-column" id="timeColumn"></div>
-            <div class="day-column" id="monday"></div>
-            <div class="day-column" id="tuesday"></div>
-            <div class="day-column" id="wednesday"></div>
-            <div class="day-column" id="thursday"></div>
-            <div class="day-column" id="friday"></div>
+        <div class="legend" id="instructorLegend"></div>
+    </div>
+
+    <div class="tab-content" id="planning-mode-tab" style="display: none;">
+        <div class="planning-container">
+            <h2>Planning Mode - Instructor Schedules</h2>
+            <p class="tab-description">View individual instructor schedules and identify potential conflicts</p>
+            <div id="planningModeContent"></div>
+        </div>
+    </div>
+
+    <div class="tab-content" id="room-conflicts-tab" style="display: none;">
+        <div class="conflicts-container">
+            <h2>Room Conflicts Detection</h2>
+            <p class="tab-description">Courses scheduled in the same room at overlapping times</p>
+            <div id="conflictsContent"></div>
         </div>
     </div>
 
@@ -370,6 +453,54 @@ def generate_html_calendar(courses: List[Dict], output_file: str):
     <script>
         const courses = {courses_json};
         const dayMap = {{ 'M': 'monday', 'T': 'tuesday', 'W': 'wednesday', 'R': 'thursday', 'F': 'friday' }};
+        let instructorColors = {{}};
+        let selectedInstructors = new Set();
+        let activeTab = 'all-courses';
+        let selectedDay = null;
+        let roomConflicts = [];
+
+        // Generate unique color for each instructor using HSL
+        function generateInstructorColors() {{
+            const instructors = [...new Set(courses.map(c => c.instructor))].sort();
+            const hueStep = 360 / instructors.length;
+            instructors.forEach((instructor, index) => {{
+                const hue = Math.floor(index * hueStep);
+                const saturation = 65 + (index % 3) * 10; // 65%, 75%, or 85%
+                const lightness = 50 + (index % 2) * 10;  // 50% or 60%
+                instructorColors[instructor] = `hsl(${{hue}}, ${{saturation}}%, ${{lightness}}%)`;
+            }});
+        }}
+
+        function getInstructorColor(instructor) {{
+            return instructorColors[instructor] || '#667eea';
+        }}
+
+        // Tab switching
+        function switchTab(tabName) {{
+            activeTab = tabName;
+
+            // Update tab buttons
+            document.querySelectorAll('.tab-btn').forEach(btn => {{
+                if (btn.getAttribute('data-tab') === tabName) {{
+                    btn.classList.add('active');
+                }} else {{
+                    btn.classList.remove('active');
+                }}
+            }});
+
+            // Update tab content visibility
+            document.querySelectorAll('.tab-content').forEach(content => {{
+                content.style.display = 'none';
+            }});
+            document.getElementById(tabName + '-tab').style.display = 'block';
+
+            // Load tab-specific content
+            if (tabName === 'planning-mode') {{
+                generatePlanningMode();
+            }} else if (tabName === 'room-conflicts') {{
+                detectAndDisplayRoomConflicts();
+            }}
+        }}
 
         function timeToMinutes(timeStr) {{
             const match = timeStr.match(/(\\d{{1,2}}):(\\d{{2}})([AP]M)/);
@@ -464,6 +595,19 @@ def generate_html_calendar(courses: List[Dict], output_file: str):
             courseBlock.style.height = `${{height}}px`;
             courseBlock.style.left = `${{column * widthPercent}}%`;
             courseBlock.style.width = `calc(${{widthPercent}}% - 4px)`;
+
+            // Use instructor-specific color
+            const instructorColor = getInstructorColor(course.instructor);
+            courseBlock.style.background = instructorColor;
+
+            // Check if this course has a room conflict
+            const hasConflict = roomConflicts.some(conflict =>
+                conflict.courses.some(c => c.crn === course.crn)
+            );
+            if (hasConflict) {{
+                courseBlock.classList.add('conflict-indicator');
+            }}
+
             courseBlock.innerHTML = `
                 <div class="course-number">${{course.course_number}}</div>
                 <div class="course-name">${{course.title}}</div>
@@ -508,7 +652,218 @@ def generate_html_calendar(courses: List[Dict], output_file: str):
             return days.split('').map(d => dayNames[d]).join(', ');
         }}
 
+        // Instructor dropdown functions
+        function populateInstructorList() {{
+            const instructors = [...new Set(courses.map(c => c.instructor))].sort();
+            const instructorList = document.getElementById('instructorList');
+            instructorList.innerHTML = '';
+
+            instructors.forEach(instructor => {{
+                const item = document.createElement('div');
+                item.className = 'instructor-checkbox-item';
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.id = `instructor-${{instructor.replace(/\\s+/g, '-')}}`;
+                checkbox.value = instructor;
+                checkbox.checked = selectedInstructors.size === 0 || selectedInstructors.has(instructor);
+                checkbox.onchange = () => toggleInstructorSelection(instructor);
+
+                const label = document.createElement('label');
+                label.setAttribute('for', checkbox.id);
+                const colorIndicator = document.createElement('span');
+                colorIndicator.className = 'instructor-color-indicator';
+                colorIndicator.style.backgroundColor = getInstructorColor(instructor);
+                label.appendChild(colorIndicator);
+                label.appendChild(document.createTextNode(instructor));
+
+                item.appendChild(checkbox);
+                item.appendChild(label);
+                instructorList.appendChild(item);
+            }});
+        }}
+
+        function toggleInstructorDropdown() {{
+            const dropdown = document.getElementById('instructorDropdown');
+            dropdown.classList.toggle('show');
+        }}
+
+        function toggleInstructorSelection(instructor) {{
+            if (selectedInstructors.has(instructor)) {{
+                selectedInstructors.delete(instructor);
+            }} else {{
+                selectedInstructors.add(instructor);
+            }}
+            updateInstructorButtonText();
+            applyFilters();
+        }}
+
+        function selectAllInstructors() {{
+            selectedInstructors.clear();
+            document.querySelectorAll('#instructorList input[type="checkbox"]').forEach(cb => {{
+                cb.checked = true;
+            }});
+            updateInstructorButtonText();
+            applyFilters();
+        }}
+
+        function clearAllInstructors() {{
+            selectedInstructors.clear();
+            document.querySelectorAll('#instructorList input[type="checkbox"]').forEach(cb => {{
+                cb.checked = false;
+                selectedInstructors.add(cb.value);
+            }});
+            // Start with one instructor selected
+            const firstCheckbox = document.querySelector('#instructorList input[type="checkbox"]');
+            if (firstCheckbox) {{
+                firstCheckbox.checked = true;
+                selectedInstructors.clear();
+                selectedInstructors.add(firstCheckbox.value);
+            }}
+            updateInstructorButtonText();
+            applyFilters();
+        }}
+
+        function updateInstructorButtonText() {{
+            const btnText = document.getElementById('instructorBtnText');
+            if (selectedInstructors.size === 0) {{
+                btnText.textContent = 'All Instructors';
+            }} else if (selectedInstructors.size === 1) {{
+                btnText.textContent = Array.from(selectedInstructors)[0];
+            }} else {{
+                btnText.textContent = `${{selectedInstructors.size}} Instructors`;
+            }}
+        }}
+
+        function applyFilters() {{
+            clearCalendar();
+            const filteredCourses = courses.filter(course => {{
+                const instructorMatch = selectedInstructors.size === 0 || selectedInstructors.has(course.instructor);
+                return instructorMatch;
+            }});
+            renderCoursesFiltered(filteredCourses);
+            updateFilterStatus();
+            updateInstructorLegend();
+        }}
+
+        function clearCalendar() {{
+            ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'].forEach(day => {{
+                const dayColumn = document.getElementById(day);
+                // Remove only course blocks, keep hour lines
+                dayColumn.querySelectorAll('.course-block').forEach(block => block.remove());
+            }});
+        }}
+
+        function renderCoursesFiltered(coursesToRender) {{
+            const startHour = 9;
+            const pixelsPerMinute = 1;
+            const coursesByDay = {{ monday: [], tuesday: [], wednesday: [], thursday: [], friday: [] }};
+
+            coursesToRender.forEach(course => {{
+                course.days.split('').forEach(day => {{
+                    const dayId = dayMap[day];
+                    if (dayId) coursesByDay[dayId].push(course);
+                }});
+            }});
+
+            Object.keys(coursesByDay).forEach(dayId => {{
+                const dayColumn = document.getElementById(dayId);
+                const coursesForDay = coursesByDay[dayId];
+                coursesForDay.sort((a, b) => timeToMinutes(a.time.start) - timeToMinutes(b.time.start));
+                const processed = new Set();
+
+                coursesForDay.forEach((course, index) => {{
+                    if (processed.has(index)) return;
+                    const startMinutes = timeToMinutes(course.time.start);
+                    const endMinutes = timeToMinutes(course.time.end);
+                    const duration = endMinutes - startMinutes;
+                    const topPosition = (startMinutes - (startHour * 60)) * pixelsPerMinute;
+                    const height = duration * pixelsPerMinute;
+                    const overlapping = [];
+
+                    for (let i = index + 1; i < coursesForDay.length; i++) {{
+                        if (processed.has(i)) continue;
+                        const other = coursesForDay[i];
+                        const otherStart = timeToMinutes(other.time.start);
+                        const otherEnd = timeToMinutes(other.time.end);
+                        if (startMinutes < otherEnd && endMinutes > otherStart) {{
+                            overlapping.push({{course: other, index: i}});
+                        }}
+                    }}
+
+                    const totalOverlapping = overlapping.length + 1;
+                    const widthPercent = 100 / totalOverlapping;
+                    renderCourseBlock(course, dayColumn, topPosition, height, 0, widthPercent);
+                    processed.add(index);
+
+                    overlapping.forEach((item, i) => {{
+                        const otherStartMinutes = timeToMinutes(item.course.time.start);
+                        const otherEndMinutes = timeToMinutes(item.course.time.end);
+                        const otherDuration = otherEndMinutes - otherStartMinutes;
+                        const otherTopPosition = (otherStartMinutes - (startHour * 60)) * pixelsPerMinute;
+                        const otherHeight = otherDuration * pixelsPerMinute;
+                        renderCourseBlock(item.course, dayColumn, otherTopPosition, otherHeight, i + 1, widthPercent);
+                        processed.add(item.index);
+                    }});
+                }});
+            }});
+        }}
+
+        function updateFilterStatus() {{
+            const filterStatus = document.getElementById('filterStatus');
+            let statusParts = [];
+
+            if (selectedDay) {{
+                const dayNames = {{
+                    'monday': 'Monday',
+                    'tuesday': 'Tuesday',
+                    'wednesday': 'Wednesday',
+                    'thursday': 'Thursday',
+                    'friday': 'Friday'
+                }};
+                statusParts.push(`${{dayNames[selectedDay]}} only`);
+            }} else {{
+                statusParts.push('all days');
+            }}
+
+            if (selectedInstructors.size === 0) {{
+                statusParts.push('all instructors');
+            }} else if (selectedInstructors.size === 1) {{
+                statusParts.push(Array.from(selectedInstructors)[0]);
+            }} else {{
+                statusParts.push(`${{selectedInstructors.size}} instructors`);
+            }}
+
+            filterStatus.textContent = `Showing: ${{statusParts.join(' | ')}}`;
+        }}
+
+        function updateInstructorLegend() {{
+            const legend = document.getElementById('instructorLegend');
+            if (!legend) return;
+
+            const instructorsToShow = selectedInstructors.size === 0
+                ? [...new Set(courses.map(c => c.instructor))].sort()
+                : Array.from(selectedInstructors).sort();
+
+            let html = '<div class="legend-title">👥 Instructor Color Key</div>';
+            instructorsToShow.forEach(instructor => {{
+                const color = getInstructorColor(instructor);
+                html += `<div class="legend-item"><span class="color-box" style="background: ${{color}}"></span>${{instructor}}</div>`;
+            }});
+            legend.innerHTML = html;
+        }}
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', function(event) {{
+            const dropdown = document.getElementById('instructorDropdown');
+            const btn = document.getElementById('instructorDropdownBtn');
+            if (dropdown && btn && !dropdown.contains(event.target) && !btn.contains(event.target)) {{
+                dropdown.classList.remove('show');
+            }}
+        }});
+
         function filterDay(day) {{
+            selectedDay = day;
+
             // Hide all day columns
             ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'].forEach(d => {{
                 const col = document.getElementById(d);
@@ -528,24 +883,18 @@ def generate_html_calendar(courses: List[Dict], output_file: str):
                 }}
             }});
 
-            // Update filter status text
-            const dayNames = {{
-                'monday': 'Monday',
-                'tuesday': 'Tuesday',
-                'wednesday': 'Wednesday',
-                'thursday': 'Thursday',
-                'friday': 'Friday'
-            }};
-            document.getElementById('filterStatus').textContent = `Showing ${{dayNames[day]}} only`;
-
             // Adjust calendar layout for single day view
             const calendarBody = document.querySelector('.calendar-body');
             const calendarHeader = document.querySelector('.calendar-header');
             calendarBody.style.gridTemplateColumns = '80px 1fr';
             calendarHeader.style.gridTemplateColumns = '80px 1fr';
+
+            updateFilterStatus();
         }}
 
         function showAllDays() {{
+            selectedDay = null;
+
             // Show all day columns
             ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'].forEach(d => {{
                 document.getElementById(d).style.display = 'block';
@@ -556,14 +905,162 @@ def generate_html_calendar(courses: List[Dict], output_file: str):
                 header.classList.remove('active');
             }});
 
-            // Update filter status text
-            document.getElementById('filterStatus').textContent = 'Showing all days';
-
             // Restore calendar layout
             const calendarBody = document.querySelector('.calendar-body');
             const calendarHeader = document.querySelector('.calendar-header');
             calendarBody.style.gridTemplateColumns = '80px repeat(5, minmax(180px, 1fr))';
             calendarHeader.style.gridTemplateColumns = '80px repeat(5, minmax(180px, 1fr))';
+
+            updateFilterStatus();
+        }}
+
+        // Room conflict detection
+        function detectRoomConflicts() {{
+            roomConflicts = [];
+            const roomGroups = {{}};
+
+            // Group courses by room
+            courses.forEach(course => {{
+                if (course.building === 'Not specified' || course.room === 'Not specified') return;
+                const roomKey = `${{course.building}} ${{course.room}}`;
+                if (!roomGroups[roomKey]) {{
+                    roomGroups[roomKey] = [];
+                }}
+                roomGroups[roomKey].push(course);
+            }});
+
+            // Check for overlaps within each room
+            Object.keys(roomGroups).forEach(roomKey => {{
+                const roomCourses = roomGroups[roomKey];
+                if (roomCourses.length < 2) return;
+
+                const conflicts = [];
+                for (let i = 0; i < roomCourses.length; i++) {{
+                    for (let j = i + 1; j < roomCourses.length; j++) {{
+                        const course1 = roomCourses[i];
+                        const course2 = roomCourses[j];
+
+                        // Check if they share any days
+                        const days1 = course1.days.split('');
+                        const days2 = course2.days.split('');
+                        const sharedDays = days1.filter(d => days2.includes(d));
+
+                        if (sharedDays.length === 0) continue;
+
+                        // Check if times overlap
+                        const start1 = timeToMinutes(course1.time.start);
+                        const end1 = timeToMinutes(course1.time.end);
+                        const start2 = timeToMinutes(course2.time.start);
+                        const end2 = timeToMinutes(course2.time.end);
+
+                        if (start1 < end2 && end1 > start2) {{
+                            // We have a conflict
+                            const existingConflict = conflicts.find(c =>
+                                c.courses.some(co => co.crn === course1.crn || co.crn === course2.crn)
+                            );
+
+                            if (existingConflict) {{
+                                if (!existingConflict.courses.some(c => c.crn === course1.crn)) {{
+                                    existingConflict.courses.push(course1);
+                                }}
+                                if (!existingConflict.courses.some(c => c.crn === course2.crn)) {{
+                                    existingConflict.courses.push(course2);
+                                }}
+                            }} else {{
+                                conflicts.push({{
+                                    room: roomKey,
+                                    courses: [course1, course2],
+                                    sharedDays: sharedDays
+                                }});
+                            }}
+                        }}
+                    }}
+                }}
+
+                roomConflicts.push(...conflicts);
+            }});
+
+            return roomConflicts;
+        }}
+
+        function detectAndDisplayRoomConflicts() {{
+            const conflicts = detectRoomConflicts();
+            const container = document.getElementById('conflictsContent');
+
+            if (conflicts.length === 0) {{
+                container.innerHTML = '<div class="no-conflicts">✅ No room conflicts detected! All courses are scheduled without overlap.</div>';
+                return;
+            }}
+
+            let html = `<div style="margin-bottom: 20px; padding: 15px; background-color: #fff3cd; border-left: 4px solid #ff6b6b; border-radius: 6px;">
+                <strong>⚠️ Found ${{conflicts.length}} room conflict${{conflicts.length > 1 ? 's' : ''}}</strong>
+                <p style="margin-top: 8px; color: #5f6368; font-size: 14px;">The following rooms have multiple courses scheduled at overlapping times:</p>
+            </div>`;
+
+            conflicts.forEach((conflict, index) => {{
+                html += `<div class="conflict-group">
+                    <div class="conflict-header">
+                        <span>📍 ${{conflict.room}}</span>
+                        <span class="conflict-severity">${{conflict.courses.length}} COURSES</span>
+                    </div>
+                    <p style="color: #721c24; font-size: 13px; margin: 10px 0;">These courses are scheduled in the same room at overlapping times:</p>
+                    <div class="conflict-courses">`;
+
+                conflict.courses.forEach(course => {{
+                    const daysExpanded = expandDays(course.days);
+                    html += `<div class="conflict-course-item">
+                        <div class="conflict-course-header">${{course.course_number}} - ${{course.title}}</div>
+                        <div class="conflict-course-details">
+                            <strong>CRN:</strong> ${{course.crn}} |
+                            <strong>Instructor:</strong> ${{course.instructor}}<br>
+                            <strong>Time:</strong> ${{course.time.raw}} |
+                            <strong>Days:</strong> ${{daysExpanded}}
+                        </div>
+                    </div>`;
+                }});
+
+                html += `</div></div>`;
+            }});
+
+            container.innerHTML = html;
+        }}
+
+        // Planning mode - show instructor schedules
+        function generatePlanningMode() {{
+            const container = document.getElementById('planningModeContent');
+            const instructors = [...new Set(courses.map(c => c.instructor))].sort();
+
+            let html = '';
+
+            instructors.forEach(instructor => {{
+                const instructorCourses = courses.filter(c => c.instructor === instructor);
+                const instructorColor = getInstructorColor(instructor);
+
+                html += `<div class="instructor-schedule">
+                    <div class="instructor-schedule-header">
+                        <span class="instructor-color-indicator" style="background-color: ${{instructorColor}}; width: 20px; height: 20px;"></span>
+                        <span>${{instructor}} (${{instructorCourses.length}} course${{instructorCourses.length > 1 ? 's' : ''}})</span>
+                    </div>
+                    <div class="instructor-schedule-courses">`;
+
+                instructorCourses.forEach(course => {{
+                    const daysExpanded = expandDays(course.days);
+                    html += `<div class="schedule-course-item" style="border-left-color: ${{instructorColor}};">
+                        <div class="schedule-course-title">${{course.course_number}} - ${{course.title}}</div>
+                        <div class="schedule-course-details">
+                            <strong>CRN:</strong> ${{course.crn}} |
+                            <strong>Time:</strong> ${{course.time.raw}} |
+                            <strong>Days:</strong> ${{daysExpanded}}<br>
+                            <strong>Location:</strong> ${{course.building}} ${{course.room}} |
+                            <strong>Credits:</strong> ${{course.credits}}
+                        </div>
+                    </div>`;
+                }});
+
+                html += `</div></div>`;
+            }});
+
+            container.innerHTML = html;
         }}
 
         window.onclick = function(event) {{
@@ -574,8 +1071,13 @@ def generate_html_calendar(courses: List[Dict], output_file: str):
             if (event.key === 'Escape') closeModal();
         }});
 
+        // Initialize
+        generateInstructorColors();
+        detectRoomConflicts();
         createTimeSlots();
         renderCourses();
+        populateInstructorList();
+        updateInstructorLegend();
     </script>
 </body>
 </html>'''

@@ -636,9 +636,6 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
                     📤 Import CSV
                 </button>
                 <input type="file" id="csvFileInput" accept=".csv" style="display: none;" onchange="handleCSVImport(event)">
-                <button class="edit-action-btn btn-save" onclick="downloadModifiedJSON()">
-                    💾 Save Changes (JSON)
-                </button>
             </div>
         </div>
     </div>

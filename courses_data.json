@@ -40,7 +40,7 @@
   {
     "status": "OPEN",
     "crn": "43788",
-    "subject": "",
+    "subject": "GEOG",
     "section": "30",
     "title": "Laboratory",
     "credits": "0.00",
@@ -54,12 +54,12 @@
     "dates": "01/12/26 - 04/27/26",
     "building": "SAMS",
     "room": "109",
-    "course_number": " 1002"
+    "course_number": "GEOG 1002"
   },
   {
     "status": "OPEN",
     "crn": "43789",
-    "subject": "",
+    "subject": "GEOG",
     "section": "31",
     "title": "Laboratory",
     "credits": "0.00",
@@ -73,12 +73,12 @@
     "dates": "01/12/26 - 04/27/26",
     "building": "SAMS",
     "room": "109",
-    "course_number": " 1002"
+    "course_number": "GEOG 1002"
   },
   {
     "status": "OPEN",
     "crn": "44633",
-    "subject": "",
+    "subject": "GEOG",
     "section": "32",
     "title": "Laboratory",
     "credits": "0.00",
@@ -92,12 +92,12 @@
     "dates": "01/12/26 - 04/27/26",
     "building": "SAMS",
     "room": "109",
-    "course_number": " 1002"
+    "course_number": "GEOG 1002"
   },
   {
     "status": "OPEN",
     "crn": "43790",
-    "subject": "",
+    "subject": "GEOG",
     "section": "33",
     "title": "Laboratory",
     "credits": "0.00",
@@ -111,7 +111,7 @@
     "dates": "01/12/26 - 04/27/26",
     "building": "SAMS",
     "room": "109",
-    "course_number": " 1002"
+    "course_number": "GEOG 1002"
   },
   {
     "status": "OPEN",
@@ -154,7 +154,7 @@
   {
     "status": "OPEN",
     "crn": "45505",
-    "subject": "",
+    "subject": "GEOG",
     "section": "30",
     "title": "Laboratory",
     "credits": "0.00",
@@ -168,12 +168,12 @@
     "dates": "01/12/26 - 04/27/26",
     "building": "SAMS",
     "room": "109",
-    "course_number": " 2104"
+    "course_number": "GEOG 2104"
   },
   {
     "status": "OPEN",
     "crn": "45506",
-    "subject": "",
+    "subject": "GEOG",
     "section": "31",
     "title": "Laboratory",
     "credits": "0.00",
@@ -187,12 +187,12 @@
     "dates": "01/12/26 - 04/27/26",
     "building": "SAMS",
     "room": "109",
-    "course_number": " 2104"
+    "course_number": "GEOG 2104"
   },
   {
     "status": "OPEN",
     "crn": "45919",
-    "subject": "",
+    "subject": "GEOG",
     "section": "32",
     "title": "Laboratory",
     "credits": "0.00",
@@ -206,12 +206,12 @@
     "dates": "01/12/26 - 04/27/26",
     "building": "SAMS",
     "room": "109",
-    "course_number": " 2104"
+    "course_number": "GEOG 2104"
   },
   {
     "status": "OPEN",
     "crn": "45507",
-    "subject": "",
+    "subject": "GEOG",
     "section": "33",
     "title": "Laboratory",
     "credits": "0.00",
@@ -225,7 +225,7 @@
     "dates": "01/12/26 - 04/27/26",
     "building": "SAMS",
     "room": "109",
-    "course_number": " 2104"
+    "course_number": "GEOG 2104"
   },
   {
     "status": "OPEN",
@@ -439,7 +439,7 @@
   {
     "status": "OPEN",
     "crn": "45758",
-    "subject": "",
+    "subject": "GEOG",
     "section": "81",
     "title": "Geographical Info Systems II",
     "credits": "3.00",
@@ -453,7 +453,7 @@
     "dates": "01/12/26 - 04/27/26",
     "building": "ROME",
     "room": "B104",
-    "course_number": " 6450"
+    "course_number": "GEOG 6450"
   },
   {
     "status": "OPEN",
@@ -724,7 +724,7 @@
   {
     "status": "OPEN",
     "crn": "45616",
-    "subject": "",
+    "subject": "GEOG",
     "section": "80",
     "title": "OpenSource: Geo-Programming II",
     "credits": "3.00",
@@ -738,7 +738,7 @@
     "dates": "01/12/26 - 04/27/26",
     "building": "GELM",
     "room": "463",
-    "course_number": " 6450"
+    "course_number": "GEOG 6450"
   },
   {
     "status": "OPEN",
@@ -1066,7 +1066,7 @@
   {
     "status": "OPEN",
     "crn": "46968",
-    "subject": "",
+    "subject": "GEOG",
     "section": "82",
     "title": "Geographic Information Systems I",
     "credits": "3.00",
@@ -1080,6 +1080,6 @@
     "dates": "01/12/26 - 04/27/26",
     "building": "SAMS",
     "room": "109",
-    "course_number": " 6304"
+    "course_number": "GEOG 6304"
   }
 ]

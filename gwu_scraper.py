@@ -609,6 +609,30 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
                 </span>
             </div>
 
+            <!-- Edit Mode Filters -->
+            <div style="margin: 20px 0; padding: 15px; background-color: #f8f9fa; border-radius: 8px; display: flex; gap: 20px; align-items: center; flex-wrap: wrap;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <label style="font-weight: 600; color: #202124;">View:</label>
+                    <select id="editDayFilter" onchange="applyEditFilters()" style="padding: 6px 12px; border: 1px solid #dadce0; border-radius: 4px; font-size: 14px; cursor: pointer;">
+                        <option value="all">Show All Days</option>
+                        <option value="monday">Monday Only</option>
+                        <option value="tuesday">Tuesday Only</option>
+                        <option value="wednesday">Wednesday Only</option>
+                        <option value="thursday">Thursday Only</option>
+                        <option value="friday">Friday Only</option>
+                    </select>
+                </div>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <label style="font-weight: 600; color: #202124;">Instructor:</label>
+                    <select id="editInstructorFilter" onchange="applyEditFilters()" style="padding: 6px 12px; border: 1px solid #dadce0; border-radius: 4px; font-size: 14px; cursor: pointer;">
+                        <option value="all">All Instructors</option>
+                    </select>
+                </div>
+                <div id="editFilterStatus" style="color: #5f6368; font-size: 14px; margin-left: auto;">
+                    Showing: <strong>all days</strong> | <strong>all instructors</strong>
+                </div>
+            </div>
+
             <div class="calendar-container edit-mode">
                 <div class="calendar-header">
                     <div class="day-header" style="background-color: white; cursor: default;"></div>
@@ -799,6 +823,8 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
         let ignoredConflicts = new Set(JSON.parse(localStorage.getItem('ignoredConflicts') || '[]'));
         let editIgnoredConflicts = new Set(JSON.parse(localStorage.getItem('editIgnoredConflicts') || '[]'));
         let currentEditCRN = null;
+        let editDayFilter = 'all';
+        let editInstructorFilter = 'all';
 
         // Generate unique color for each instructor using HSL
         function generateInstructorColors() {{
@@ -1572,6 +1598,7 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
         function initializeEditMode() {{
             populateTimePickers();
             populateInstructorDatalist();
+            populateEditInstructorFilter();
             renderEditCalendar();
             displayEditModeConflicts();
             updateEditCount();
@@ -1580,6 +1607,35 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
             document.querySelectorAll('input[name="editDay"]').forEach(checkbox => {{
                 checkbox.addEventListener('change', syncDayCheckboxes);
             }});
+        }}
+
+        // Populate instructor filter dropdown in edit mode
+        function populateEditInstructorFilter() {{
+            const instructorSelect = document.getElementById('editInstructorFilter');
+            const instructors = [...new Set(editedCourses.map(c => c.instructor))].sort();
+
+            // Keep "All Instructors" option, add individual instructors
+            instructorSelect.innerHTML = '<option value="all">All Instructors</option>';
+            instructors.forEach(instructor => {{
+                const option = document.createElement('option');
+                option.value = instructor;
+                option.textContent = instructor;
+                instructorSelect.appendChild(option);
+            }});
+        }}
+
+        // Apply edit mode filters
+        function applyEditFilters() {{
+            editDayFilter = document.getElementById('editDayFilter').value;
+            editInstructorFilter = document.getElementById('editInstructorFilter').value;
+
+            // Update status text
+            const dayText = editDayFilter === 'all' ? 'all days' : editDayFilter;
+            const instructorText = editInstructorFilter === 'all' ? 'all instructors' : editInstructorFilter;
+            document.getElementById('editFilterStatus').innerHTML = `Showing: <strong>${{dayText}}</strong> | <strong>${{instructorText}}</strong>`;
+
+            // Re-render calendar with filters
+            renderEditCalendar();
         }}
 
         // Populate time picker dropdowns with 10-minute intervals
@@ -1664,13 +1720,22 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
                 document.getElementById(`edit-${{day}}`).innerHTML = '';
             }});
 
-            // Group courses by day
+            // Group courses by day with filters applied
             const coursesByDay = {{ monday: [], tuesday: [], wednesday: [], thursday: [], friday: [] }};
             editedCourses.forEach(course => {{
                 if (!course.days || !course.time) return;
+
+                // Apply instructor filter
+                if (editInstructorFilter !== 'all' && course.instructor !== editInstructorFilter) return;
+
                 course.days.split('').forEach(dayLetter => {{
                     const dayName = dayMap[dayLetter];
-                    if (dayName) coursesByDay[dayName].push(course);
+                    if (!dayName) return;
+
+                    // Apply day filter
+                    if (editDayFilter !== 'all' && dayName !== editDayFilter) return;
+
+                    coursesByDay[dayName].push(course);
                 }});
             }});
 
@@ -2067,6 +2132,7 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
 
             editCount++;
             updateEditCount();
+            populateEditInstructorFilter();
             renderEditCalendar();
             displayEditModeConflicts();
             populateInstructorDatalist();
@@ -2089,6 +2155,7 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
                 editedCRNs.delete(crn);
                 editCount++;
                 updateEditCount();
+                populateEditInstructorFilter();
                 renderEditCalendar();
                 displayEditModeConflicts();
                 closeEditModal();
@@ -2120,6 +2187,7 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
             editedCRNs.add(newCRN);
             editCount++;
             updateEditCount();
+            populateEditInstructorFilter();
             renderEditCalendar();
             displayEditModeConflicts();
             closeEditModal();
@@ -2287,6 +2355,7 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
 
                     editCount += imported.length;
                     updateEditCount();
+                    populateEditInstructorFilter();
                     renderEditCalendar();
                     displayEditModeConflicts();
                     populateInstructorDatalist();

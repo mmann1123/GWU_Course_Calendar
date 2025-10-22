@@ -419,25 +419,6 @@
   },
   {
     "status": "OPEN",
-    "crn": "44634",
-    "subject": "GEOG",
-    "section": "80",
-    "title": "Geographic Information Systems II",
-    "credits": "3.00",
-    "instructor": "Hurley, B",
-    "days": "M",
-    "time": {
-      "start": "07:10PM",
-      "end": "09:00PM",
-      "raw": "07:10PM - 09:00PM"
-    },
-    "dates": "01/12/26 - 04/27/26",
-    "building": "ROME",
-    "room": "B104",
-    "course_number": "GEOG 6306"
-  },
-  {
-    "status": "OPEN",
     "crn": "45758",
     "subject": "GEOG",
     "section": "81",
@@ -454,6 +435,25 @@
     "building": "ROME",
     "room": "B104",
     "course_number": "GEOG 6450"
+  },
+  {
+    "status": "OPEN",
+    "crn": "44634",
+    "subject": "GEOG",
+    "section": "80",
+    "title": "Geographic Information Systems II",
+    "credits": "3.00",
+    "instructor": "Hurley, B",
+    "days": "M",
+    "time": {
+      "start": "07:10PM",
+      "end": "09:00PM",
+      "raw": "07:10PM - 09:00PM"
+    },
+    "dates": "01/12/26 - 04/27/26",
+    "building": "ROME",
+    "room": "B104",
+    "course_number": "GEOG 6306"
   },
   {
     "status": "OPEN",

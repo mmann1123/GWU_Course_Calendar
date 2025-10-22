@@ -155,6 +155,7 @@ class CourseScraper:
                         'status': status,
                         'crn': crn,
                         'subject': subject,
+                        'course_num': course_num,
                         'section': section,
                         'title': title,
                         'credits': credits,
@@ -632,10 +633,11 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
                 <button class="edit-action-btn btn-export" onclick="exportToCSV()">
                     📥 Export to CSV
                 </button>
-                <button class="edit-action-btn btn-import" onclick="document.getElementById('csvFileInput').click()">
+                <!-- Import CSV temporarily disabled -->
+                <!-- <button class="edit-action-btn btn-import" onclick="document.getElementById('csvFileInput').click()">
                     📤 Import CSV
                 </button>
-                <input type="file" id="csvFileInput" accept=".csv" style="display: none;" onchange="handleCSVImport(event)">
+                <input type="file" id="csvFileInput" accept=".csv" style="display: none;" onchange="handleCSVImport(event)"> -->
             </div>
         </div>
     </div>
@@ -679,9 +681,16 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
                             <input type="text" id="editSubject" required maxlength="10" placeholder="GEOG">
                         </div>
                         <div class="form-group">
+                            <label for="editCourseNum">Course Number <span class="required">*</span></label>
+                            <input type="text" id="editCourseNum" required maxlength="10" placeholder="1001">
+                        </div>
+                        <div class="form-group">
                             <label for="editSection">Section <span class="required">*</span></label>
                             <input type="text" id="editSection" required maxlength="10" placeholder="10">
                         </div>
+                    </div>
+
+                    <div class="form-row">
                         <div class="form-group">
                             <label for="editCRNInput">CRN <span class="required">*</span></label>
                             <input type="text" id="editCRNInput" required maxlength="10" placeholder="12345">
@@ -1773,6 +1782,7 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
             document.getElementById('editCRN').value = course.crn;
             document.getElementById('originalCRN').value = course.crn;
             document.getElementById('editSubject').value = course.subject || '';
+            document.getElementById('editCourseNum').value = course.course_num || '';
             document.getElementById('editSection').value = course.section || '';
             document.getElementById('editCRNInput').value = course.crn || '';
             document.getElementById('editTitle').value = course.title || '';
@@ -1835,6 +1845,7 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
             const courseData = {{
                 crn: newCRN,
                 subject: document.getElementById('editSubject').value,
+                course_num: document.getElementById('editCourseNum').value,
                 section: document.getElementById('editSection').value,
                 title: document.getElementById('editTitle').value,
                 credits: document.getElementById('editCredits').value,
@@ -1848,7 +1859,7 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
                 building: document.getElementById('editBuilding').value || 'Not specified',
                 room: document.getElementById('editRoom').value || 'Not specified',
                 dates: document.getElementById('editDates').value || '01/12/26 - 04/27/26',
-                course_number: `${{document.getElementById('editSubject').value}} ${{document.getElementById('editSection').value}}`,
+                course_number: `${{document.getElementById('editSubject').value}} ${{document.getElementById('editCourseNum').value}}`,
                 status: 'OPEN'
             }};
 
@@ -1915,7 +1926,7 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
                 ...originalCourse,
                 crn: newCRN,
                 section: newSection,
-                course_number: `${{originalCourse.subject}} ${{newSection}}`
+                course_number: `${{originalCourse.subject}} ${{originalCourse.course_num}}`
             }};
 
             editedCourses.push(duplicatedCourse);
@@ -1935,10 +1946,18 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
 
         // Export to CSV
         function exportToCSV() {{
-            const headers = ['CRN', 'Subject', 'Section', 'Title', 'Credits', 'Instructor', 'Days', 'StartTime', 'EndTime', 'Building', 'Room', 'Dates'];
-            const rows = editedCourses.map(c => [
+            // Sort by instructor, then by course_number
+            const sortedCourses = [...editedCourses].sort((a, b) => {{
+                const instructorCompare = (a.instructor || '').localeCompare(b.instructor || '');
+                if (instructorCompare !== 0) return instructorCompare;
+                return (a.course_number || '').localeCompare(b.course_number || '');
+            }});
+
+            const headers = ['CRN', 'Subject', 'CourseNum', 'Section', 'Title', 'Credits', 'Instructor', 'Days', 'StartTime', 'EndTime', 'Building', 'Room', 'Dates'];
+            const rows = sortedCourses.map(c => [
                 c.crn,
                 c.subject,
+                c.course_num,
                 c.section,
                 c.title,
                 c.credits,
@@ -1983,36 +2002,91 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
             reader.onload = function(e) {{
                 const csv = e.target.result;
                 const lines = csv.split('\\n').filter(line => line.trim());
+
+                if (lines.length === 0) {{
+                    showToast('❌ CSV file is empty', 'error');
+                    return;
+                }}
+
                 const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
 
                 const imported = [];
                 for (let i = 1; i < lines.length; i++) {{
                     const values = parseCSVLine(lines[i]);
-                    if (values.length < headers.length) continue;
+
+                    console.log(`Row ${{i}}: parsed ${{values.length}} columns`, values);
+
+                    if (values.length < 6) {{
+                        console.warn(`Skipping row ${{i}}: only ${{values.length}} columns (need at least 6)`);
+                        continue;
+                    }}
+
+                    // Parse the course data with proper validation
+                    // CSV format: CRN, Subject, CourseNum, Section, Title, Credits, Instructor, Days, StartTime, EndTime, Building, Room, Dates
+                    const crn = values[0]?.trim();
+                    const subject = values[1]?.trim() || 'GEOG';
+                    const course_num = values[2]?.trim();
+                    const section = values[3]?.trim();
+                    const title = values[4]?.trim();
+                    const credits = values[5]?.trim() || '0.00';
+                    const instructor = values[6]?.trim();
+                    const days = values[7]?.trim() || 'MW';
+                    const startTime = values[8]?.trim() || '09:00AM';
+                    const endTime = values[9]?.trim() || '10:00AM';
+                    const building = values[10]?.trim() || 'Not specified';
+                    const room = values[11]?.trim() || 'Not specified';
+                    const dates = values[12]?.trim() || '01/12/26 - 04/27/26';
+
+                    if (!crn || !title || !instructor) {{
+                        console.warn(`Skipping row ${{i}}: missing required fields - CRN=${{crn}}, Title=${{title}}, Instructor=${{instructor}}`);
+                        continue;
+                    }}
+
+                    // Validate time format
+                    if (!startTime.match(/\\d{{1,2}}:\\d{{2}}[AP]M/) || !endTime.match(/\\d{{1,2}}:\\d{{2}}[AP]M/)) {{
+                        console.warn(`Skipping row ${{i}}: invalid time format - Start=${{startTime}}, End=${{endTime}}`);
+                        continue;
+                    }}
+
+                    // Validate days format
+                    if (!days.match(/^[MTWRF]+$/)) {{
+                        console.warn(`Skipping row ${{i}}: invalid days format - Days=${{days}}`);
+                        continue;
+                    }}
 
                     const course = {{
-                        crn: values[0],
-                        subject: values[1],
-                        section: values[2],
-                        title: values[3],
-                        credits: values[4],
-                        instructor: values[5],
-                        days: values[6],
+                        crn: crn,
+                        subject: subject,
+                        course_num: course_num,
+                        section: section,
+                        title: title,
+                        credits: credits,
+                        instructor: instructor,
+                        days: days,
                         time: {{
-                            start: values[7],
-                            end: values[8],
-                            raw: `${{values[7]}} - ${{values[8]}}`
+                            start: startTime,
+                            end: endTime,
+                            raw: `${{startTime}} - ${{endTime}}`
                         }},
-                        building: values[9] || 'Not specified',
-                        room: values[10] || 'Not specified',
-                        dates: values[11] || '01/12/26 - 04/27/26',
-                        course_number: `${{values[1]}} ${{values[2]}}`,
+                        building: building,
+                        room: room,
+                        dates: dates,
+                        course_number: `${{subject}} ${{course_num}}`,
                         status: 'OPEN'
                     }};
                     imported.push(course);
                 }}
 
+                if (imported.length === 0) {{
+                    showToast('❌ No valid courses found in CSV', 'error');
+                    return;
+                }}
+
                 if (confirm(`Import ${{imported.length}} courses? Existing courses with matching CRNs will be replaced.`)) {{
+                    // Clear edit tracking for fresh import
+                    editedCRNs.clear();
+
+                    // Update or add courses
                     imported.forEach(importedCourse => {{
                         const index = editedCourses.findIndex(c => c.crn === importedCourse.crn);
                         if (index !== -1) {{

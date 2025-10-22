@@ -1627,21 +1627,29 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
             }});
 
             instructors.forEach(instructor => {{
-                const checkbox = document.createElement('div');
-                checkbox.className = 'instructor-checkbox';
-                const isChecked = editSelectedInstructors.size === 0 || editSelectedInstructors.has(instructor);
-                checkbox.innerHTML = `
-                    <label>
-                        <input type="checkbox"
-                               id="edit-instructor-${{instructor.replace(/\\s+/g, '-')}}"
-                               value="${{instructor}}"
-                               ${{isChecked ? 'checked' : ''}}
-                               onchange="toggleEditInstructorSelection('${{instructor}}')">
-                        <span class="color-box" style="background-color: ${{instructorColors[instructor]}}"></span>
-                        ${{instructor}}
-                    </label>
-                `;
-                instructorList.appendChild(checkbox);
+                const item = document.createElement('div');
+                item.className = 'instructor-checkbox-item';
+
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.id = `edit-instructor-${{instructor.replace(/\\s+/g, '-')}}`;
+                checkbox.value = instructor;
+                checkbox.checked = editSelectedInstructors.size === 0 || editSelectedInstructors.has(instructor);
+                checkbox.onchange = () => toggleEditInstructorSelection(instructor);
+
+                const label = document.createElement('label');
+                label.setAttribute('for', checkbox.id);
+
+                const colorIndicator = document.createElement('span');
+                colorIndicator.className = 'instructor-color-indicator';
+                colorIndicator.style.backgroundColor = getInstructorColor(instructor);
+
+                label.appendChild(colorIndicator);
+                label.appendChild(document.createTextNode(instructor));
+
+                item.appendChild(checkbox);
+                item.appendChild(label);
+                instructorList.appendChild(item);
             }});
         }}
 

@@ -62,7 +62,8 @@ sudo dnf install python3 python3-pip    # Fedora
 #### **Windows Users**
 1. Open the folder where you unzipped the files
 2. **Double-click** on `launch_gui.bat`
-3. A window will open - that's the app!
+3. Run despite warning
+4. A window will open - that's the app!
 
 #### **Mac/Linux Users**
 1. Open **Terminal**

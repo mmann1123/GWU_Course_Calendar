@@ -21,6 +21,13 @@ class CourseScraper:
         self.courses = []
         self.courses_by_crn = {}  # Track by CRN for deduplication
 
+        # Extract subject code from URL for fallback
+        self.subject_code = None
+        if url:
+            subject_match = re.search(r'subjId=([A-Z]+)', url)
+            if subject_match:
+                self.subject_code = subject_match.group(1)
+
     def detect_total_pages(self, html_content: str) -> int:
         """Detect total number of pages from pagination links"""
         page_nums = re.findall(r"goToPage\('(\d+)'\)", html_content)
@@ -76,6 +83,10 @@ class CourseScraper:
                     subject_cell = cells[2]
                     subject = subject_cell.find('span', style=lambda x: x and 'font-weight:bold' in x)
                     subject = subject.get_text(strip=True) if subject else ''
+
+                    # Use URL subject code as fallback if subject is empty
+                    if not subject and self.subject_code:
+                        subject = self.subject_code
 
                     # Course number (e.g., 1001, 1002)
                     course_link = subject_cell.find('a')
@@ -144,6 +155,7 @@ class CourseScraper:
                         'status': status,
                         'crn': crn,
                         'subject': subject,
+                        'course_num': course_num,
                         'section': section,
                         'title': title,
                         'credits': credits,
@@ -431,6 +443,57 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
         .no-conflicts {{ padding: 30px; text-align: center; color: #5f6368; font-size: 16px; }}
         .conflict-indicator {{ border: 3px solid #ff6b6b !important; box-shadow: 0 0 0 3px rgba(255,107,107,0.2) !important; }}
         .conflict-hidden {{ display: none; }}
+
+        /* Edit Mode Styles */
+        .edit-container {{ background-color: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }}
+        .edit-container h2 {{ color: #202124; margin-bottom: 10px; font-size: 24px; }}
+
+        .edit-toolbar-top {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding: 15px; background-color: #f8f9fa; border-radius: 8px; }}
+        .edit-toolbar-bottom {{ display: flex; gap: 15px; justify-content: center; margin-top: 20px; padding: 20px; background-color: #f8f9fa; border-radius: 8px; }}
+
+        .edit-action-btn {{ padding: 12px 24px; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600; transition: all 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }}
+        .edit-action-btn:hover {{ transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.15); }}
+        .btn-primary {{ background: linear-gradient(135deg, #1a73e8 0%, #4285f4 100%); color: white; }}
+        .btn-secondary {{ background-color: #f1f3f4; color: #5f6368; }}
+        .btn-secondary:hover {{ background-color: #e8eaed; }}
+        .btn-danger {{ background: linear-gradient(135deg, #ea4335 0%, #d33b2c 100%); color: white; }}
+        .btn-info {{ background: linear-gradient(135deg, #fbbc04 0%, #f9ab00 100%); color: #202124; }}
+        .btn-export {{ background: linear-gradient(135deg, #34a853 0%, #0f9d58 100%); color: white; }}
+        .btn-import {{ background: linear-gradient(135deg, #4285f4 0%, #1a73e8 100%); color: white; }}
+        .btn-save {{ background: linear-gradient(135deg, #9334e6 0%, #7c3aed 100%); color: white; }}
+
+        .edit-status {{ font-size: 14px; color: #5f6368; }}
+        .edit-status #editCount {{ font-weight: 700; color: #ea4335; font-size: 18px; }}
+
+        .calendar-container.edit-mode {{ border: 3px solid #fbbc04; box-shadow: 0 4px 16px rgba(251,188,4,0.2); }}
+        .calendar-container.edit-mode .course-block {{ cursor: pointer; border: 2px solid rgba(255,255,255,0.5); }}
+        .calendar-container.edit-mode .course-block:hover {{ border: 2px solid white; transform: translateY(-3px) scale(1.03); }}
+        .calendar-container.edit-mode .course-block.edited {{ position: relative; }}
+        .calendar-container.edit-mode .course-block.edited::after {{ content: '⚠️'; position: absolute; top: 2px; right: 2px; font-size: 12px; }}
+
+        /* Edit Modal Styles */
+        .edit-modal-content {{ max-width: 700px; max-height: 90vh; overflow-y: auto; }}
+        .edit-modal-content h2 {{ font-size: 22px; color: #1a73e8; margin-bottom: 20px; }}
+
+        .form-group {{ margin-bottom: 20px; }}
+        .form-group label {{ display: block; font-weight: 600; color: #202124; margin-bottom: 8px; font-size: 14px; }}
+        .form-group input, .form-group select {{ width: 100%; padding: 10px 12px; border: 1px solid #dadce0; border-radius: 6px; font-size: 14px; transition: all 0.2s; }}
+        .form-group input:focus, .form-group select:focus {{ border-color: #1a73e8; outline: none; box-shadow: 0 0 0 3px rgba(26,115,232,0.1); }}
+
+        .form-row {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; }}
+
+        .required {{ color: #ea4335; font-weight: 700; }}
+
+        .day-checkboxes {{ display: flex; gap: 15px; margin-top: 10px; flex-wrap: wrap; }}
+        .day-checkboxes label {{ display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; cursor: pointer; padding: 8px 12px; background-color: #f1f3f4; border-radius: 6px; transition: all 0.2s; }}
+        .day-checkboxes label:hover {{ background-color: #e8f0fe; }}
+        .day-checkboxes input[type="checkbox"]:checked + * {{ color: #1a73e8; }}
+        .day-checkboxes input[type="checkbox"] {{ accent-color: #1a73e8; width: 16px; height: 16px; }}
+
+        .error-message {{ color: #ea4335; font-size: 13px; margin-top: 5px; padding: 8px; background-color: #fce8e6; border-radius: 4px; }}
+
+        .modal-actions {{ display: flex; gap: 12px; justify-content: flex-end; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e8eaed; }}
+        .modal-actions button {{ padding: 10px 20px; }}
     </style>
 </head>
 <body>
@@ -469,6 +532,7 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
         <button class="tab-btn active" data-tab="all-courses" onclick="switchTab('all-courses')">📅 All Courses</button>
         <button class="tab-btn" data-tab="planning-mode" onclick="switchTab('planning-mode')">📋 Class List</button>
         <button class="tab-btn" data-tab="room-conflicts" onclick="switchTab('room-conflicts')">⚠️ Room Conflicts</button>
+        <button class="tab-btn" data-tab="edit-schedule" onclick="switchTab('edit-schedule')">✏️ Edit Schedule</button>
     </div>
 
     <div class="filter-controls">
@@ -531,6 +595,53 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
         </div>
     </div>
 
+    <div class="tab-content" id="edit-schedule-tab" style="display: none;">
+        <div class="edit-container">
+            <h2>Edit Schedule</h2>
+            <p class="tab-description">Add, remove, or modify courses. Changes are saved locally until exported.</p>
+
+            <div class="edit-toolbar-top">
+                <button class="edit-action-btn btn-primary" onclick="openAddCourseModal()">
+                    ➕ Add New Course
+                </button>
+                <span class="edit-status" id="editStatus">
+                    <span id="editCount">0</span> unsaved changes
+                </span>
+            </div>
+
+            <div class="calendar-container edit-mode">
+                <div class="calendar-header">
+                    <div class="day-header" style="background-color: white; cursor: default;"></div>
+                    <div class="day-header">Monday</div>
+                    <div class="day-header">Tuesday</div>
+                    <div class="day-header">Wednesday</div>
+                    <div class="day-header">Thursday</div>
+                    <div class="day-header">Friday</div>
+                </div>
+
+                <div class="calendar-body" id="editCalendarBody">
+                    <div class="time-column" id="editTimeColumn"></div>
+                    <div class="day-column" id="edit-monday"></div>
+                    <div class="day-column" id="edit-tuesday"></div>
+                    <div class="day-column" id="edit-wednesday"></div>
+                    <div class="day-column" id="edit-thursday"></div>
+                    <div class="day-column" id="edit-friday"></div>
+                </div>
+            </div>
+
+            <div class="edit-toolbar-bottom">
+                <button class="edit-action-btn btn-export" onclick="exportToCSV()">
+                    📥 Export to CSV
+                </button>
+                <!-- Import CSV temporarily disabled -->
+                <!-- <button class="edit-action-btn btn-import" onclick="document.getElementById('csvFileInput').click()">
+                    📤 Import CSV
+                </button>
+                <input type="file" id="csvFileInput" accept=".csv" style="display: none;" onchange="handleCSVImport(event)"> -->
+            </div>
+        </div>
+    </div>
+
     <div id="modal" class="modal">
         <div class="modal-content">
             <span class="close-btn" onclick="closeModal()">&times;</span>
@@ -552,6 +663,116 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
         </div>
     </div>
 
+    <!-- Edit Modal -->
+    <div id="editModal" class="modal">
+        <div class="modal-content edit-modal-content">
+            <span class="close-btn" onclick="closeEditModal()">&times;</span>
+            <div class="modal-header">
+                <h2 id="editModalTitle">Edit Course</h2>
+            </div>
+            <div class="modal-body">
+                <form id="editCourseForm" onsubmit="saveCourseEdit(event)">
+                    <input type="hidden" id="editCRN">
+                    <input type="hidden" id="originalCRN">
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="editSubject">Subject Code <span class="required">*</span></label>
+                            <input type="text" id="editSubject" required maxlength="10" placeholder="GEOG">
+                        </div>
+                        <div class="form-group">
+                            <label for="editCourseNum">Course Number <span class="required">*</span></label>
+                            <input type="text" id="editCourseNum" required maxlength="10" placeholder="1001">
+                        </div>
+                        <div class="form-group">
+                            <label for="editSection">Section <span class="required">*</span></label>
+                            <input type="text" id="editSection" required maxlength="10" placeholder="10">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="editCRNInput">CRN <span class="required">*</span></label>
+                            <input type="text" id="editCRNInput" required maxlength="10" placeholder="12345">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="editTitle">Course Title <span class="required">*</span></label>
+                        <input type="text" id="editTitle" required placeholder="Introduction to Geography">
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="editCredits">Credits <span class="required">*</span></label>
+                            <input type="number" id="editCredits" required step="0.01" min="0" max="20" placeholder="3.00">
+                        </div>
+                        <div class="form-group">
+                            <label for="editInstructor">Instructor <span class="required">*</span></label>
+                            <input type="text" id="editInstructor" required placeholder="Last, F" list="instructorList">
+                            <datalist id="instructorList"></datalist>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Days <span class="required">*</span></label>
+                        <select id="editDayPreset" onchange="applyDayPreset()">
+                            <option value="">-- Select Pattern --</option>
+                            <option value="MW">MW (Monday/Wednesday)</option>
+                            <option value="TR">TR (Tuesday/Thursday)</option>
+                            <option value="MWF">MWF (Monday/Wednesday/Friday)</option>
+                            <option value="MTWRF">MTWRF (Every weekday)</option>
+                            <option value="custom">Custom (select below)</option>
+                        </select>
+                        <div class="day-checkboxes">
+                            <label><input type="checkbox" name="editDay" value="M"> Monday</label>
+                            <label><input type="checkbox" name="editDay" value="T"> Tuesday</label>
+                            <label><input type="checkbox" name="editDay" value="W"> Wednesday</label>
+                            <label><input type="checkbox" name="editDay" value="R"> Thursday</label>
+                            <label><input type="checkbox" name="editDay" value="F"> Friday</label>
+                        </div>
+                        <div id="daysError" class="error-message" style="display: none;">Please select at least one day</div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="editStartTime">Start Time <span class="required">*</span></label>
+                            <select id="editStartTime" required></select>
+                        </div>
+                        <div class="form-group">
+                            <label for="editEndTime">End Time <span class="required">*</span></label>
+                            <select id="editEndTime" required></select>
+                        </div>
+                    </div>
+                    <div id="timeError" class="error-message" style="display: none;">End time must be after start time</div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="editBuilding">Building</label>
+                            <input type="text" id="editBuilding" placeholder="1957 E">
+                        </div>
+                        <div class="form-group">
+                            <label for="editRoom">Room</label>
+                            <input type="text" id="editRoom" placeholder="B12">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="editDates">Semester Dates</label>
+                        <input type="text" id="editDates" placeholder="01/12/26 - 04/27/26">
+                    </div>
+
+                    <div class="modal-actions">
+                        <button type="button" class="btn-secondary" onclick="closeEditModal()">Cancel</button>
+                        <button type="button" class="btn-danger" id="deleteCourseBtn" onclick="deleteCourse()">🗑️ Delete Course</button>
+                        <button type="button" class="btn-info" id="duplicateCourseBtn" onclick="duplicateCourse()">📋 Duplicate</button>
+                        <button type="submit" class="btn-primary">💾 Save Changes</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <script>
         const courses = {courses_json};
         const dayMap = {{ 'M': 'monday', 'T': 'tuesday', 'W': 'wednesday', 'R': 'thursday', 'F': 'friday' }};
@@ -560,6 +781,13 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
         let activeTab = 'all-courses';
         let selectedDay = null;
         let roomConflicts = [];
+
+        // Edit mode variables
+        let editedCourses = JSON.parse(JSON.stringify(courses)); // Deep copy for editing
+        let editCount = 0;
+        let editedCRNs = new Set();
+        let ignoredConflicts = new Set(JSON.parse(localStorage.getItem('ignoredConflicts') || '[]'));
+        let currentEditCRN = null;
 
         // Generate unique color for each instructor using HSL
         function generateInstructorColors() {{
@@ -601,6 +829,8 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
                 generatePlanningMode();
             }} else if (tabName === 'room-conflicts') {{
                 detectAndDisplayRoomConflicts();
+            }} else if (tabName === 'edit-schedule') {{
+                initializeEditMode();
             }}
         }}
 
@@ -1183,11 +1413,19 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
             </div>`;
 
             conflicts.forEach((conflict, index) => {{
-                html += `<div class="conflict-group" id="conflict-${{index}}">
-                    <button class="conflict-ignore-btn" onclick="ignoreConflict(${{index}})">✕ Ignore</button>
+                // Generate conflict signature for persistence
+                const crns = conflict.courses.map(c => c.crn).sort().join('-');
+                const conflictSig = `${{conflict.room}}_${{conflict.courses[0].days}}_${{conflict.courses[0].time.start}}_${{crns}}`;
+                const isIgnored = ignoredConflicts.has(conflictSig);
+
+                html += `<div class="conflict-group${{isIgnored ? ' conflict-hidden' : ''}}" id="conflict-${{index}}" data-signature="${{conflictSig}}">
+                    <button class="conflict-ignore-btn" onclick="toggleIgnoreConflict('${{conflictSig}}', ${{index}})">
+                        ${{isIgnored ? '↶ Show' : '✕ Ignore'}}
+                    </button>
                     <div class="conflict-header">
                         <span>📍 ${{conflict.room}}</span>
                         <span class="conflict-severity">${{conflict.courses.length}} COURSES</span>
+                        ${{isIgnored ? '<span style="margin-left: 10px; font-size: 12px; color: #666;">(Previously Ignored)</span>' : ''}}
                     </div>
                     <p style="color: #721c24; font-size: 13px; margin: 10px 0;">These courses are scheduled in the same room at overlapping times:</p>
                     <div class="conflict-courses">`;
@@ -1208,14 +1446,50 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
                 html += `</div></div>`;
             }});
 
+            // Add reset button if there are ignored conflicts
+            if (ignoredConflicts.size > 0) {{
+                html += `<div style="margin-top: 20px; text-align: center;">
+                    <button class="edit-action-btn btn-secondary" onclick="resetIgnoredConflicts()">
+                        ↶ Reset All Ignored Conflicts (${{ignoredConflicts.size}})
+                    </button>
+                </div>`;
+            }}
+
             container.innerHTML = html;
         }}
 
-        function ignoreConflict(conflictIndex) {{
-            const conflictElement = document.getElementById(`conflict-${{conflictIndex}}`);
-            if (conflictElement) {{
+        // Toggle ignore conflict (with localStorage persistence)
+        function toggleIgnoreConflict(signature, index) {{
+            const conflictElement = document.getElementById(`conflict-${{index}}`);
+            if (!conflictElement) return;
+
+            if (ignoredConflicts.has(signature)) {{
+                // Un-ignore
+                ignoredConflicts.delete(signature);
+                conflictElement.classList.remove('conflict-hidden');
+            }} else {{
+                // Ignore
+                ignoredConflicts.add(signature);
                 conflictElement.classList.add('conflict-hidden');
             }}
+
+            // Persist to localStorage
+            localStorage.setItem('ignoredConflicts', JSON.stringify([...ignoredConflicts]));
+
+            // Refresh the display to update button and counter
+            detectAndDisplayRoomConflicts();
+        }}
+
+        // Reset all ignored conflicts
+        function resetIgnoredConflicts() {{
+            if (!confirm('Are you sure you want to reset all ignored conflicts? This will show all conflicts again.')) {{
+                return;
+            }}
+
+            ignoredConflicts.clear();
+            localStorage.removeItem('ignoredConflicts');
+            detectAndDisplayRoomConflicts();
+            showToast('↶ All ignored conflicts have been reset', 'info');
         }}
 
         // Class list - show instructor schedules
@@ -1269,11 +1543,639 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
 
         window.onclick = function(event) {{
             if (event.target === document.getElementById('modal')) closeModal();
+            if (event.target === document.getElementById('editModal')) closeEditModal();
         }}
 
         document.addEventListener('keydown', function(event) {{
-            if (event.key === 'Escape') closeModal();
+            if (event.key === 'Escape') {{
+                closeModal();
+                closeEditModal();
+            }}
         }});
+
+        // ============================================================================
+        // EDIT MODE FUNCTIONS
+        // ============================================================================
+
+        // Initialize edit mode
+        function initializeEditMode() {{
+            populateTimePickers();
+            populateInstructorDatalist();
+            renderEditCalendar();
+            updateEditCount();
+
+            // Add checkbox change listeners
+            document.querySelectorAll('input[name="editDay"]').forEach(checkbox => {{
+                checkbox.addEventListener('change', syncDayCheckboxes);
+            }});
+        }}
+
+        // Populate time picker dropdowns with 10-minute intervals
+        function populateTimePickers() {{
+            const startSelect = document.getElementById('editStartTime');
+            const endSelect = document.getElementById('editEndTime');
+
+            if (startSelect.options.length > 0) return; // Already populated
+
+            const times = [];
+            for (let hour = 9; hour <= 21; hour++) {{
+                for (let min = 0; min < 60; min += 10) {{
+                    const period = hour >= 12 ? 'PM' : 'AM';
+                    const displayHour = hour > 12 ? hour - 12 : (hour === 0 ? 12 : hour);
+                    const timeStr = `${{displayHour.toString().padStart(2, '0')}}:${{min.toString().padStart(2, '0')}}${{period}}`;
+                    times.push(timeStr);
+                }}
+            }}
+
+            times.forEach(time => {{
+                startSelect.add(new Option(time, time));
+                endSelect.add(new Option(time, time));
+            }});
+        }}
+
+        // Populate instructor datalist
+        function populateInstructorDatalist() {{
+            const datalist = document.getElementById('instructorList');
+            const instructors = [...new Set(editedCourses.map(c => c.instructor))].sort();
+            datalist.innerHTML = '';
+            instructors.forEach(instructor => {{
+                const option = document.createElement('option');
+                option.value = instructor;
+                datalist.appendChild(option);
+            }});
+        }}
+
+        // Apply day preset to checkboxes
+        function applyDayPreset() {{
+            const preset = document.getElementById('editDayPreset').value;
+            const checkboxes = document.querySelectorAll('input[name="editDay"]');
+
+            checkboxes.forEach(cb => cb.checked = false);
+
+            if (preset && preset !== 'custom') {{
+                preset.split('').forEach(day => {{
+                    const checkbox = document.querySelector(`input[name="editDay"][value="${{day}}"]`);
+                    if (checkbox) checkbox.checked = true;
+                }});
+            }}
+        }}
+
+        // Sync day checkboxes to preset dropdown
+        function syncDayCheckboxes() {{
+            const checkedDays = Array.from(document.querySelectorAll('input[name="editDay"]:checked'))
+                .map(cb => cb.value).join('');
+            const preset = document.getElementById('editDayPreset');
+
+            const presetMatch = Array.from(preset.options).find(opt => opt.value === checkedDays);
+            preset.value = presetMatch ? checkedDays : 'custom';
+        }}
+
+        // Render edit calendar with overlap detection
+        function renderEditCalendar() {{
+            const editTimeColumn = document.getElementById('editTimeColumn');
+            const startHour = 9;
+            const pixelsPerMinute = 1;
+
+            // Create time slots
+            editTimeColumn.innerHTML = '';
+            for (let hour = 9; hour <= 21; hour++) {{
+                const timeSlot = document.createElement('div');
+                timeSlot.className = 'time-slot';
+                const period = hour >= 12 ? 'PM' : 'AM';
+                const displayHour = hour > 12 ? hour - 12 : hour;
+                timeSlot.textContent = `${{displayHour}}:00 ${{period}}`;
+                editTimeColumn.appendChild(timeSlot);
+            }}
+
+            // Clear day columns
+            ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'].forEach(day => {{
+                document.getElementById(`edit-${{day}}`).innerHTML = '';
+            }});
+
+            // Group courses by day
+            const coursesByDay = {{ monday: [], tuesday: [], wednesday: [], thursday: [], friday: [] }};
+            editedCourses.forEach(course => {{
+                if (!course.days || !course.time) return;
+                course.days.split('').forEach(dayLetter => {{
+                    const dayName = dayMap[dayLetter];
+                    if (dayName) coursesByDay[dayName].push(course);
+                }});
+            }});
+
+            // Render courses with overlap detection
+            Object.keys(coursesByDay).forEach(dayName => {{
+                const dayColumn = document.getElementById(`edit-${{dayName}}`);
+                const coursesForDay = coursesByDay[dayName];
+
+                // Sort by start time
+                coursesForDay.sort((a, b) => timeToMinutes(a.time.start) - timeToMinutes(b.time.start));
+
+                const processed = new Set();
+
+                coursesForDay.forEach((course, index) => {{
+                    if (processed.has(index)) return;
+
+                    const startMinutes = timeToMinutes(course.time.start);
+                    const endMinutes = timeToMinutes(course.time.end);
+                    const duration = endMinutes - startMinutes;
+                    const topPosition = (startMinutes - (startHour * 60)) * pixelsPerMinute;
+                    const height = duration * pixelsPerMinute;
+
+                    // Find overlapping courses
+                    const overlapping = [];
+                    for (let i = index + 1; i < coursesForDay.length; i++) {{
+                        if (processed.has(i)) continue;
+                        const other = coursesForDay[i];
+                        const otherStart = timeToMinutes(other.time.start);
+                        const otherEnd = timeToMinutes(other.time.end);
+                        if (startMinutes < otherEnd && endMinutes > otherStart) {{
+                            overlapping.push({{course: other, index: i}});
+                        }}
+                    }}
+
+                    // Calculate widths and positions
+                    const totalOverlapping = overlapping.length + 1;
+                    const widthPercent = 100 / totalOverlapping;
+
+                    // Render main course
+                    renderEditCourseBlock(course, dayColumn, topPosition, height, 0, widthPercent);
+                    processed.add(index);
+
+                    // Render overlapping courses
+                    overlapping.forEach((item, i) => {{
+                        const otherStartMinutes = timeToMinutes(item.course.time.start);
+                        const otherEndMinutes = timeToMinutes(item.course.time.end);
+                        const otherDuration = otherEndMinutes - otherStartMinutes;
+                        const otherTopPosition = (otherStartMinutes - (startHour * 60)) * pixelsPerMinute;
+                        const otherHeight = otherDuration * pixelsPerMinute;
+                        renderEditCourseBlock(item.course, dayColumn, otherTopPosition, otherHeight, i + 1, widthPercent);
+                        processed.add(item.index);
+                    }});
+                }});
+            }});
+        }}
+
+        // Render editable course block with overlap support
+        function renderEditCourseBlock(course, dayColumn, topPosition, height, column, widthPercent) {{
+            const block = document.createElement('div');
+            block.className = 'course-block';
+
+            // Mark edited courses
+            if (editedCRNs.has(course.crn)) {{
+                block.classList.add('edited');
+            }}
+
+            // Position and size
+            block.style.top = `${{topPosition}}px`;
+            block.style.height = `${{height}}px`;
+            block.style.left = `${{column * widthPercent}}%`;
+            block.style.width = `calc(${{widthPercent}}% - 4px)`;
+
+            // Use instructor-specific color
+            block.style.background = getInstructorColor(course.instructor);
+
+            block.innerHTML = `
+                <div class="course-number">${{course.course_number}}</div>
+                <div class="course-name">${{course.title}}</div>
+                <div class="course-time">${{course.time.start}}</div>
+                <div class="tooltip">
+                    <div class="tooltip-row"><span class="tooltip-label">Course:</span><span class="tooltip-value">${{course.course_number}}</span></div>
+                    <div class="tooltip-row"><span class="tooltip-label">Title:</span><span class="tooltip-value">${{course.title}}</span></div>
+                    <div class="tooltip-row"><span class="tooltip-label">Instructor:</span><span class="tooltip-value">${{course.instructor}}</span></div>
+                    <div class="tooltip-row"><span class="tooltip-label">Time:</span><span class="tooltip-value">${{course.time.raw}}</span></div>
+                    <div class="tooltip-row"><span class="tooltip-label">Room:</span><span class="tooltip-value">${{course.building}} ${{course.room}}</span></div>
+                    <div class="tooltip-row"><span class="tooltip-label">CRN:</span><span class="tooltip-value">${{course.crn}}</span></div>
+                    <div class="tooltip-row"><span class="tooltip-label">Credits:</span><span class="tooltip-value">${{course.credits}}</span></div>
+                    ${{editedCRNs.has(course.crn) ? '<div class="tooltip-row" style="color: #fbbc04; font-weight: 700;">⚠️ Modified</div>' : ''}}
+                    <div class="tooltip-row" style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #555; font-style: italic; color: #aaa;">Click to edit</div>
+                </div>
+            `;
+
+            block.onclick = () => openEditCourseModal(course);
+
+            dayColumn.appendChild(block);
+        }}
+
+        // Open modal to add new course
+        function openAddCourseModal() {{
+            currentEditCRN = null;
+            document.getElementById('editModalTitle').textContent = 'Add New Course';
+            document.getElementById('editCourseForm').reset();
+            document.getElementById('deleteCourseBtn').style.display = 'none';
+            document.getElementById('duplicateCourseBtn').style.display = 'none';
+
+            // Generate new CRN
+            const maxCRN = Math.max(...editedCourses.map(c => parseInt(c.crn) || 0));
+            document.getElementById('editCRNInput').value = (maxCRN + 1).toString();
+
+            document.getElementById('editModal').style.display = 'block';
+        }}
+
+        // Open modal to edit existing course
+        function openEditCourseModal(course) {{
+            currentEditCRN = course.crn;
+            document.getElementById('editModalTitle').textContent = 'Edit Course';
+            document.getElementById('deleteCourseBtn').style.display = 'inline-block';
+            document.getElementById('duplicateCourseBtn').style.display = 'inline-block';
+
+            // Populate form
+            document.getElementById('editCRN').value = course.crn;
+            document.getElementById('originalCRN').value = course.crn;
+            document.getElementById('editSubject').value = course.subject || '';
+            document.getElementById('editCourseNum').value = course.course_num || '';
+            document.getElementById('editSection').value = course.section || '';
+            document.getElementById('editCRNInput').value = course.crn || '';
+            document.getElementById('editTitle').value = course.title || '';
+            document.getElementById('editCredits').value = course.credits || '';
+            document.getElementById('editInstructor').value = course.instructor || '';
+            document.getElementById('editStartTime').value = course.time.start || '';
+            document.getElementById('editEndTime').value = course.time.end || '';
+            document.getElementById('editBuilding').value = course.building || '';
+            document.getElementById('editRoom').value = course.room || '';
+            document.getElementById('editDates').value = course.dates || '';
+
+            // Set days
+            document.querySelectorAll('input[name="editDay"]').forEach(cb => cb.checked = false);
+            if (course.days) {{
+                course.days.split('').forEach(day => {{
+                    const checkbox = document.querySelector(`input[name="editDay"][value="${{day}}"]`);
+                    if (checkbox) checkbox.checked = true;
+                }});
+            }}
+            syncDayCheckboxes();
+
+            document.getElementById('editModal').style.display = 'block';
+        }}
+
+        // Close edit modal
+        function closeEditModal() {{
+            document.getElementById('editModal').style.display = 'none';
+            document.getElementById('daysError').style.display = 'none';
+            document.getElementById('timeError').style.display = 'none';
+        }}
+
+        // Save course edit
+        function saveCourseEdit(event) {{
+            event.preventDefault();
+
+            // Validate days
+            const selectedDays = Array.from(document.querySelectorAll('input[name="editDay"]:checked'))
+                .map(cb => cb.value).join('');
+            if (!selectedDays) {{
+                document.getElementById('daysError').style.display = 'block';
+                return;
+            }} else {{
+                document.getElementById('daysError').style.display = 'none';
+            }}
+
+            // Validate times
+            const startTime = document.getElementById('editStartTime').value;
+            const endTime = document.getElementById('editEndTime').value;
+            if (timeToMinutes(startTime) >= timeToMinutes(endTime)) {{
+                document.getElementById('timeError').style.display = 'block';
+                return;
+            }} else {{
+                document.getElementById('timeError').style.display = 'none';
+            }}
+
+            // Get form data
+            const newCRN = document.getElementById('editCRNInput').value;
+            const originalCRN = document.getElementById('originalCRN').value;
+
+            const courseData = {{
+                crn: newCRN,
+                subject: document.getElementById('editSubject').value,
+                course_num: document.getElementById('editCourseNum').value,
+                section: document.getElementById('editSection').value,
+                title: document.getElementById('editTitle').value,
+                credits: document.getElementById('editCredits').value,
+                instructor: document.getElementById('editInstructor').value,
+                days: selectedDays,
+                time: {{
+                    start: startTime,
+                    end: endTime,
+                    raw: `${{startTime}} - ${{endTime}}`
+                }},
+                building: document.getElementById('editBuilding').value || 'Not specified',
+                room: document.getElementById('editRoom').value || 'Not specified',
+                dates: document.getElementById('editDates').value || '01/12/26 - 04/27/26',
+                course_number: `${{document.getElementById('editSubject').value}} ${{document.getElementById('editCourseNum').value}}`,
+                status: 'OPEN'
+            }};
+
+            // Update or add course
+            if (originalCRN) {{
+                // Editing existing course
+                const index = editedCourses.findIndex(c => c.crn === originalCRN);
+                if (index !== -1) {{
+                    editedCourses[index] = courseData;
+                    editedCRNs.add(newCRN);
+                    if (originalCRN !== newCRN) {{
+                        editedCRNs.delete(originalCRN);
+                    }}
+                }}
+            }} else {{
+                // Adding new course
+                editedCourses.push(courseData);
+                editedCRNs.add(newCRN);
+            }}
+
+            editCount++;
+            updateEditCount();
+            renderEditCalendar();
+            populateInstructorDatalist();
+            closeEditModal();
+
+            showToast('✅ Course saved successfully!', 'success');
+        }}
+
+        // Delete course
+        function deleteCourse() {{
+            if (!confirm('Are you sure you want to delete this course? This cannot be undone.')) {{
+                return;
+            }}
+
+            const crn = document.getElementById('editCRNInput').value;
+            const index = editedCourses.findIndex(c => c.crn === crn);
+
+            if (index !== -1) {{
+                editedCourses.splice(index, 1);
+                editedCRNs.delete(crn);
+                editCount++;
+                updateEditCount();
+                renderEditCalendar();
+                closeEditModal();
+                showToast('🗑️ Course deleted', 'info');
+            }}
+        }}
+
+        // Duplicate course
+        function duplicateCourse() {{
+            const originalCRN = document.getElementById('editCRNInput').value;
+            const originalCourse = editedCourses.find(c => c.crn === originalCRN);
+
+            if (!originalCourse) return;
+
+            // Generate new CRN and increment section
+            const maxCRN = Math.max(...editedCourses.map(c => parseInt(c.crn) || 0));
+            const newCRN = (maxCRN + 1).toString();
+            const sectionNum = parseInt(originalCourse.section) || 10;
+            const newSection = (sectionNum + 10).toString();
+
+            const duplicatedCourse = {{
+                ...originalCourse,
+                crn: newCRN,
+                section: newSection,
+                course_number: `${{originalCourse.subject}} ${{originalCourse.course_num}}`
+            }};
+
+            editedCourses.push(duplicatedCourse);
+            editedCRNs.add(newCRN);
+            editCount++;
+            updateEditCount();
+            renderEditCalendar();
+            closeEditModal();
+
+            showToast('📋 Course duplicated successfully!', 'success');
+        }}
+
+        // Update edit count display
+        function updateEditCount() {{
+            document.getElementById('editCount').textContent = editedCRNs.size;
+        }}
+
+        // Export to CSV
+        function exportToCSV() {{
+            // Sort by instructor, then by course_number
+            const sortedCourses = [...editedCourses].sort((a, b) => {{
+                const instructorCompare = (a.instructor || '').localeCompare(b.instructor || '');
+                if (instructorCompare !== 0) return instructorCompare;
+                return (a.course_number || '').localeCompare(b.course_number || '');
+            }});
+
+            const headers = ['CRN', 'Subject', 'CourseNum', 'Section', 'Title', 'Credits', 'Instructor', 'Days', 'StartTime', 'EndTime', 'Building', 'Room', 'Dates'];
+            const rows = sortedCourses.map(c => [
+                c.crn,
+                c.subject,
+                c.course_num,
+                c.section,
+                c.title,
+                c.credits,
+                c.instructor,
+                c.days,
+                c.time.start,
+                c.time.end,
+                c.building,
+                c.room,
+                c.dates
+            ]);
+
+            const csvContent = [
+                headers.join(','),
+                ...rows.map(row => row.map(cell => {{
+                    const cellStr = (cell || '').toString();
+                    // Escape quotes and wrap in quotes if contains comma or quote
+                    if (cellStr.includes(',') || cellStr.includes('"') || cellStr.includes('\\n')) {{
+                        return `"${{cellStr.replace(/"/g, '""')}}"`;
+                    }}
+                    return cellStr;
+                }}).join(','))
+            ].join('\\n');
+
+            const blob = new Blob([csvContent], {{ type: 'text/csv' }});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `schedule_${{new Date().toISOString().slice(0,10)}}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+
+            showToast('📥 CSV exported successfully!', 'success');
+        }}
+
+        // Handle CSV import
+        function handleCSVImport(event) {{
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {{
+                const csv = e.target.result;
+                const lines = csv.split('\\n').filter(line => line.trim());
+
+                if (lines.length === 0) {{
+                    showToast('❌ CSV file is empty', 'error');
+                    return;
+                }}
+
+                const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
+
+                const imported = [];
+                for (let i = 1; i < lines.length; i++) {{
+                    const values = parseCSVLine(lines[i]);
+
+                    console.log(`Row ${{i}}: parsed ${{values.length}} columns`, values);
+
+                    if (values.length < 6) {{
+                        console.warn(`Skipping row ${{i}}: only ${{values.length}} columns (need at least 6)`);
+                        continue;
+                    }}
+
+                    // Parse the course data with proper validation
+                    // CSV format: CRN, Subject, CourseNum, Section, Title, Credits, Instructor, Days, StartTime, EndTime, Building, Room, Dates
+                    const crn = values[0]?.trim();
+                    const subject = values[1]?.trim() || 'GEOG';
+                    const course_num = values[2]?.trim();
+                    const section = values[3]?.trim();
+                    const title = values[4]?.trim();
+                    const credits = values[5]?.trim() || '0.00';
+                    const instructor = values[6]?.trim();
+                    const days = values[7]?.trim() || 'MW';
+                    const startTime = values[8]?.trim() || '09:00AM';
+                    const endTime = values[9]?.trim() || '10:00AM';
+                    const building = values[10]?.trim() || 'Not specified';
+                    const room = values[11]?.trim() || 'Not specified';
+                    const dates = values[12]?.trim() || '01/12/26 - 04/27/26';
+
+                    if (!crn || !title || !instructor) {{
+                        console.warn(`Skipping row ${{i}}: missing required fields - CRN=${{crn}}, Title=${{title}}, Instructor=${{instructor}}`);
+                        continue;
+                    }}
+
+                    // Validate time format
+                    if (!startTime.match(/\\d{{1,2}}:\\d{{2}}[AP]M/) || !endTime.match(/\\d{{1,2}}:\\d{{2}}[AP]M/)) {{
+                        console.warn(`Skipping row ${{i}}: invalid time format - Start=${{startTime}}, End=${{endTime}}`);
+                        continue;
+                    }}
+
+                    // Validate days format
+                    if (!days.match(/^[MTWRF]+$/)) {{
+                        console.warn(`Skipping row ${{i}}: invalid days format - Days=${{days}}`);
+                        continue;
+                    }}
+
+                    const course = {{
+                        crn: crn,
+                        subject: subject,
+                        course_num: course_num,
+                        section: section,
+                        title: title,
+                        credits: credits,
+                        instructor: instructor,
+                        days: days,
+                        time: {{
+                            start: startTime,
+                            end: endTime,
+                            raw: `${{startTime}} - ${{endTime}}`
+                        }},
+                        building: building,
+                        room: room,
+                        dates: dates,
+                        course_number: `${{subject}} ${{course_num}}`,
+                        status: 'OPEN'
+                    }};
+                    imported.push(course);
+                }}
+
+                if (imported.length === 0) {{
+                    showToast('❌ No valid courses found in CSV', 'error');
+                    return;
+                }}
+
+                if (confirm(`Import ${{imported.length}} courses? Existing courses with matching CRNs will be replaced.`)) {{
+                    // Clear edit tracking for fresh import
+                    editedCRNs.clear();
+
+                    // Update or add courses
+                    imported.forEach(importedCourse => {{
+                        const index = editedCourses.findIndex(c => c.crn === importedCourse.crn);
+                        if (index !== -1) {{
+                            editedCourses[index] = importedCourse;
+                        }} else {{
+                            editedCourses.push(importedCourse);
+                        }}
+                        editedCRNs.add(importedCourse.crn);
+                    }});
+
+                    editCount += imported.length;
+                    updateEditCount();
+                    renderEditCalendar();
+                    populateInstructorDatalist();
+                    showToast(`📤 Imported ${{imported.length}} courses successfully!`, 'success');
+                }}
+            }};
+            reader.readAsText(file);
+            event.target.value = ''; // Reset file input
+        }}
+
+        // Parse CSV line handling quotes and commas
+        function parseCSVLine(line) {{
+            const result = [];
+            let current = '';
+            let inQuotes = false;
+
+            for (let i = 0; i < line.length; i++) {{
+                const char = line[i];
+                const nextChar = line[i + 1];
+
+                if (char === '"' && inQuotes && nextChar === '"') {{
+                    current += '"';
+                    i++;
+                }} else if (char === '"') {{
+                    inQuotes = !inQuotes;
+                }} else if (char === ',' && !inQuotes) {{
+                    result.push(current.trim());
+                    current = '';
+                }} else {{
+                    current += char;
+                }}
+            }}
+            result.push(current.trim());
+            return result;
+        }}
+
+        // Download modified JSON
+        function downloadModifiedJSON() {{
+            const json = JSON.stringify(editedCourses, null, 2);
+            const blob = new Blob([json], {{ type: 'application/json' }});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `gwu_course_calendar_edited_${{new Date().toISOString().slice(0,10)}}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+
+            showToast('💾 JSON saved successfully!', 'success');
+        }}
+
+        // Show toast notification
+        function showToast(message, type) {{
+            const toast = document.createElement('div');
+            toast.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                padding: 15px 25px;
+                background: ${{type === 'success' ? '#34a853' : type === 'error' ? '#ea4335' : '#4285f4'}};
+                color: white;
+                border-radius: 8px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                z-index: 10000;
+                font-weight: 600;
+                animation: slideIn 0.3s ease;
+            `;
+            toast.textContent = message;
+            document.body.appendChild(toast);
+
+            setTimeout(() => {{
+                toast.style.animation = 'slideOut 0.3s ease';
+                setTimeout(() => toast.remove(), 300);
+            }}, 3000);
+        }}
+
+        // ============================================================================
+        // END EDIT MODE FUNCTIONS
+        // ============================================================================
 
         // Initialize
         generateInstructorColors();

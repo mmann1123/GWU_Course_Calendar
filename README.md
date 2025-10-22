@@ -2,6 +2,8 @@
 
 An interactive Python application that scrapes course data from GWU's schedule website and generates a beautiful Google Calendar-style weekly view.
 
+![class scheduler demo](static/class_scheduler2.gif)
+
 ## Features
 
 ✅ **Web Scraping**: Automatically fetches course data from GWU's course schedule  

@@ -141,6 +141,8 @@ The interactive calendar includes a powerful **Edit Mode** for planning and modi
 
 ### How to Use Edit Mode
 
+![edit mode demo](static/editmode.gif)
+
 1. **Open the calendar HTML file** in your web browser
 2. **Click the "✏️ Edit Schedule" tab** at the top
 3. **Make changes**:

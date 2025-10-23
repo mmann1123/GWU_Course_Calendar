@@ -468,7 +468,7 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
         .calendar-container.edit-mode {{ border: 3px solid #fbbc04; box-shadow: 0 4px 16px rgba(251,188,4,0.2); }}
         .calendar-container.edit-mode .course-block {{ cursor: pointer; border: 2px solid rgba(255,255,255,0.5); }}
         .calendar-container.edit-mode .course-block:hover {{ border: 2px solid white; transform: translateY(-3px) scale(1.03); }}
-        .calendar-container.edit-mode .course-block.edited {{ position: relative; }}
+        .calendar-container.edit-mode .course-block.edited {{ position: absolute; }}
         .calendar-container.edit-mode .course-block.edited::after {{ content: '⚠️'; position: absolute; top: 2px; right: 2px; font-size: 12px; }}
 
         /* Edit Modal Styles */
@@ -658,11 +658,10 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
                 <button class="edit-action-btn btn-export" onclick="exportToCSV()">
                     📥 Export to CSV
                 </button>
-                <!-- Import CSV temporarily disabled -->
-                <!-- <button class="edit-action-btn btn-import" onclick="document.getElementById('csvFileInput').click()">
+                <button class="edit-action-btn btn-import" onclick="document.getElementById('csvFileInput').click()">
                     📤 Import CSV
                 </button>
-                <input type="file" id="csvFileInput" accept=".csv" style="display: none;" onchange="handleCSVImport(event)"> -->
+                <input type="file" id="csvFileInput" accept=".csv" style="display: none;" onchange="handleCSVImport(event)">
             </div>
 
             <!-- Edit Mode Conflicts Section -->
@@ -826,6 +825,7 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
         let currentEditCRN = null;
         let editSelectedInstructors = new Set();
         let editRoomFilter = 'all';
+        let isImporting = false; // Flag to prevent multiple renders during import
 
         // Generate unique color for each instructor using HSL
         function generateInstructorColors() {{
@@ -880,13 +880,23 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
 
         function timeToMinutes(timeStr) {{
             const match = timeStr.match(/(\\d{{1,2}}):(\\d{{2}})([AP]M)/);
-            if (!match) return 0;
+            if (!match) {{
+                console.error('timeToMinutes: Failed to parse time string:', timeStr);
+                return 0;
+            }}
             let hours = parseInt(match[1]);
             const minutes = parseInt(match[2]);
             const period = match[3];
             if (period === 'PM' && hours !== 12) hours += 12;
             if (period === 'AM' && hours === 12) hours = 0;
-            return hours * 60 + minutes;
+            const result = hours * 60 + minutes;
+
+            // Debug log for any imported course times
+            if (timeStr === '11:00AM' || timeStr === '12:50PM' || timeStr === '09:00AM' || timeStr === '10:50AM') {{
+                console.log(`timeToMinutes('${{timeStr}}') = ${{result}} (hours=${{hours}}, minutes=${{minutes}}, period=${{period}})`);
+            }}
+
+            return result;
         }}
 
         function createTimeSlots() {{
@@ -1733,6 +1743,12 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
 
         // Apply edit mode filters
         function applyEditFilters() {{
+            // Skip rendering if we're currently importing data
+            if (isImporting) {{
+                console.log('applyEditFilters: Skipping render during import');
+                return;
+            }}
+
             editRoomFilter = document.getElementById('editRoomFilter').value;
 
             // Update status text
@@ -1872,8 +1888,27 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
                 const dayColumn = document.getElementById(`edit-${{dayName}}`);
                 const coursesForDay = coursesByDay[dayName];
 
+                // Debug: Log all courses for Tuesday to see what's being grouped
+                if (dayName === 'tuesday') {{
+                    console.log('=== DEBUG TUESDAY COURSES (BEFORE SORT) ===');
+                    console.log('Total courses on Tuesday:', coursesForDay.length);
+                    coursesForDay.forEach((c, idx) => {{
+                        const mins = timeToMinutes(c.time.start);
+                        console.log(`[${{idx}}] CRN ${{c.crn}}: ${{c.time.start}} - ${{c.time.end}} (start=${{mins}} mins) | ${{c.course_number}} ${{c.title}}`);
+                    }});
+                }}
+
                 // Sort by start time
                 coursesForDay.sort((a, b) => timeToMinutes(a.time.start) - timeToMinutes(b.time.start));
+
+                // Debug: Log after sorting
+                if (dayName === 'tuesday') {{
+                    console.log('=== DEBUG TUESDAY COURSES (AFTER SORT) ===');
+                    coursesForDay.forEach((c, idx) => {{
+                        const mins = timeToMinutes(c.time.start);
+                        console.log(`[${{idx}}] CRN ${{c.crn}}: ${{c.time.start}} - ${{c.time.end}} (start=${{mins}} mins) | ${{c.course_number}} ${{c.title}}`);
+                    }});
+                }}
 
                 const processed = new Set();
 
@@ -1885,6 +1920,16 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
                     const duration = endMinutes - startMinutes;
                     const topPosition = (startMinutes - (startHour * 60)) * pixelsPerMinute;
                     const height = duration * pixelsPerMinute;
+
+                    // Debug log for ALL courses on Tuesday to see positioning
+                    if (dayName === 'tuesday') {{
+                        console.log(`=== RENDER CRN ${{course.crn}} ===`);
+                        console.log('  time.start:', course.time.start, '→', startMinutes, 'minutes');
+                        console.log('  time.end:', course.time.end, '→', endMinutes, 'minutes');
+                        console.log('  duration:', duration, 'minutes');
+                        console.log('  topPosition:', topPosition, 'px');
+                        console.log('  height:', height, 'px');
+                    }}
 
                     // Find overlapping courses
                     const overlapping = [];
@@ -1924,6 +1969,11 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
         function renderEditCourseBlock(course, dayColumn, topPosition, height, column, widthPercent) {{
             const block = document.createElement('div');
             block.className = 'course-block';
+
+            // Debug Tuesday renders
+            if (dayColumn.id === 'edit-tuesday' && course.time.start === '11:00AM') {{
+                console.log(`  → renderEditCourseBlock CRN ${{course.crn}}: top=${{topPosition}}px, left=${{(column * widthPercent).toFixed(1)}}%, width=${{widthPercent.toFixed(1)}}%, column=${{column}}`);
+            }}
 
             // Mark edited courses
             if (editedCRNs.has(course.crn)) {{
@@ -2441,7 +2491,9 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
                         continue;
                     }}
 
+                    // Create course object matching EXACT scraper format
                     const course = {{
+                        status: 'OPEN',
                         crn: crn,
                         subject: subject,
                         course_num: course_num,
@@ -2455,12 +2507,25 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
                             end: endTime,
                             raw: `${{startTime}} - ${{endTime}}`
                         }},
+                        dates: dates,
                         building: building,
                         room: room,
-                        dates: dates,
-                        course_number: `${{subject}} ${{course_num}}`,
-                        status: 'OPEN'
+                        course_number: `${{subject}} ${{course_num}}`
                     }};
+
+                    // Debug log for problematic course
+                    if (crn === '43789') {{
+                        console.log('=== DEBUG CRN 43789 IMPORT ===');
+                        console.log('Raw CSV values:', values);
+                        console.log('StartTime from CSV (index 8):', values[8]);
+                        console.log('EndTime from CSV (index 9):', values[9]);
+                        console.log('Parsed startTime:', startTime);
+                        console.log('Parsed endTime:', endTime);
+                        console.log('Full course object:', JSON.stringify(course, null, 2));
+                        console.log('timeToMinutes(startTime):', timeToMinutes(startTime));
+                        console.log('timeToMinutes(endTime):', timeToMinutes(endTime));
+                    }}
+
                     imported.push(course);
                 }}
 
@@ -2469,25 +2534,42 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
                     return;
                 }}
 
-                if (confirm(`Import ${{imported.length}} courses? Existing courses with matching CRNs will be replaced.`)) {{
-                    // Clear edit tracking for fresh import
+                if (confirm(`Import ${{imported.length}} courses? This will REPLACE all current courses in edit mode.`)) {{
+                    console.log('=== CSV IMPORT: REPLACING editedCourses ===');
+                    console.log('Old editedCourses length:', editedCourses.length);
+                    console.log('New imported length:', imported.length);
+
+                    // Set flag to prevent multiple renders during import
+                    isImporting = true;
+
+                    // REPLACE all courses with imported data (not merge)
+                    editedCourses = imported;
                     editedCRNs.clear();
 
-                    // Update or add courses
-                    imported.forEach(importedCourse => {{
-                        const index = editedCourses.findIndex(c => c.crn === importedCourse.crn);
-                        if (index !== -1) {{
-                            editedCourses[index] = importedCourse;
-                        }} else {{
-                            editedCourses.push(importedCourse);
-                        }}
-                        editedCRNs.add(importedCourse.crn);
+                    // Mark all imported courses as edited
+                    imported.forEach(course => {{
+                        editedCRNs.add(course.crn);
                     }});
 
-                    editCount += imported.length;
+                    console.log('After replacement - editedCourses length:', editedCourses.length);
+                    console.log('After replacement - editedCourses === imported?', editedCourses === imported);
+
+                    // Verify first 3 courses in editedCourses
+                    console.log('=== FIRST 3 COURSES IN editedCourses ===');
+                    editedCourses.slice(0, 3).forEach((c, idx) => {{
+                        console.log(`[${{idx}}] CRN ${{c.crn}}: ${{c.days}} ${{c.time.start}}-${{c.time.end}} | ${{c.course_number}} ${{c.title}}`);
+                    }});
+
+                    editCount = imported.length;
                     updateEditCount();
                     populateEditInstructorFilter();
                     populateEditRoomFilter();
+
+                    // Clear the flag before rendering
+                    isImporting = false;
+
+                    // Now render once
+                    console.log('CSV Import: Rendering calendar once...');
                     renderEditCalendar();
                     displayEditModeConflicts();
                     populateInstructorDatalist();

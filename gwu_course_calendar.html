@@ -219,7 +219,7 @@
     <div class="main-content">
         <div class="header">
             <h1>🗓️ GWU Courses - Spring 2026</h1>
-            <p>Interactive Course Schedule | Scraped from GWU website on October 23, 2025</p>
+            <p>Interactive Course Schedule | Scraped from GWU website on October 24, 2025</p>
         </div>
 
     <div class="stats">
@@ -1468,7 +1468,7 @@
             }
         });
 
-        // Populate time picker dropdowns with 10-minute intervals
+        // Populate time picker dropdowns with 5-minute intervals
         function populateTimePickers() {
             const startSelect = document.getElementById('editStartTime');
             const endSelect = document.getElementById('editEndTime');
@@ -1477,7 +1477,7 @@
 
             const times = [];
             for (let hour = 9; hour <= 21; hour++) {
-                for (let min = 0; min < 60; min += 10) {
+                for (let min = 0; min < 60; min += 5) {
                     const period = hour >= 12 ? 'PM' : 'AM';
                     const displayHour = hour > 12 ? hour - 12 : (hour === 0 ? 12 : hour);
                     const timeStr = `${displayHour.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')}${period}`;
@@ -2353,7 +2353,7 @@
         </div>
         <div class="rtd-footer-attribution">
             Credit: Michael Mann, Dept of Geography & Environment<br>
-            Scraped on October 23, 2025 at 08:18 PM | Built with Python & BeautifulSoup
+            Scraped on October 24, 2025 at 11:38 AM | Built with Python & BeautifulSoup
         </div>
     </footer>
 </body>

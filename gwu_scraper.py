@@ -536,10 +536,25 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
     </div>
 
     <div class="filter-controls" id="mainCalendarFilters">
-        <span class="filter-text">View:</span>
         <button class="filter-btn" onclick="showAllDays()">Show All Days</button>
-        <span class="filter-text">|</span>
-        <span class="filter-text">Instructors:</span>
+        <div class="instructor-selector-wrapper">
+            <button class="filter-btn" id="levelDropdownBtn" onclick="toggleLevelDropdown()">
+                <span id="levelBtnText">All Levels</span> ▼
+            </button>
+            <div class="instructor-dropdown" id="levelDropdown">
+                <div class="instructor-list" style="max-height: 200px;">
+                    <div class="instructor-checkbox-item" onclick="setLevelFilter('all')">
+                        <label style="cursor: pointer;">All Levels</label>
+                    </div>
+                    <div class="instructor-checkbox-item" onclick="setLevelFilter('undergrad')">
+                        <label style="cursor: pointer;">Undergrad (< 6000)</label>
+                    </div>
+                    <div class="instructor-checkbox-item" onclick="setLevelFilter('grad')">
+                        <label style="cursor: pointer;">Grad (>= 6000)</label>
+                    </div>
+                </div>
+            </div>
+        </div>
         <div class="instructor-selector-wrapper">
             <button class="filter-btn" id="instructorDropdownBtn" onclick="toggleInstructorDropdown()">
                 <span id="instructorBtnText">All Instructors</span> ▼
@@ -611,12 +626,32 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
 
             <!-- Edit Mode Filters -->
             <div class="filter-controls" style="margin: 20px 0;">
-                <span class="filter-text">Room:</span>
-                <select id="editRoomFilter" onchange="applyEditFilters()" style="padding: 6px 12px; border: 1px solid #dadce0; border-radius: 4px; font-size: 14px; cursor: pointer; background-color: white;">
-                    <option value="all">All Rooms</option>
-                </select>
-                <span class="filter-text">|</span>
-                <span class="filter-text">Instructors:</span>
+                <div class="instructor-selector-wrapper">
+                    <button class="filter-btn" id="editRoomDropdownBtn" onclick="toggleEditRoomDropdown()">
+                        <span id="editRoomBtnText">All Rooms</span> ▼
+                    </button>
+                    <div class="instructor-dropdown" id="editRoomDropdown">
+                        <div class="instructor-list" id="editRoomList" style="max-height: 300px;"></div>
+                    </div>
+                </div>
+                <div class="instructor-selector-wrapper">
+                    <button class="filter-btn" id="editLevelDropdownBtn" onclick="toggleEditLevelDropdown()">
+                        <span id="editLevelBtnText">All Levels</span> ▼
+                    </button>
+                    <div class="instructor-dropdown" id="editLevelDropdown">
+                        <div class="instructor-list" style="max-height: 200px;">
+                            <div class="instructor-checkbox-item" onclick="setEditLevelFilter('all')">
+                                <label style="cursor: pointer;">All Levels</label>
+                            </div>
+                            <div class="instructor-checkbox-item" onclick="setEditLevelFilter('undergrad')">
+                                <label style="cursor: pointer;">Undergrad (< 6000)</label>
+                            </div>
+                            <div class="instructor-checkbox-item" onclick="setEditLevelFilter('grad')">
+                                <label style="cursor: pointer;">Grad (>= 6000)</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
                 <div class="instructor-selector-wrapper">
                     <button class="filter-btn" id="editInstructorDropdownBtn" onclick="toggleEditInstructorDropdown()">
                         <span id="editInstructorBtnText">All Instructors</span> ▼
@@ -807,6 +842,7 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
         let activeTab = 'all-courses';
         let selectedDay = null;
         let roomConflicts = [];
+        let levelFilter = 'all';
 
         // Edit mode variables
         let editedCourses = JSON.parse(JSON.stringify(courses)); // Deep copy for editing
@@ -817,6 +853,7 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
         let currentEditCRN = null;
         let editSelectedInstructors = new Set();
         let editRoomFilter = 'all';
+        let editLevelFilter = 'all';
         let isImporting = false; // Flag to prevent multiple renders during import
 
         // Generate unique color for each instructor using HSL
@@ -889,6 +926,20 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
             }}
 
             return result;
+        }}
+
+        // Helper function to extract course level and determine if grad/undergrad
+        function getCourseLevel(courseNumber) {{
+            // Extract the numeric part from course_number (e.g., "GEOG 1001" -> 1001)
+            const match = courseNumber.match(/\\d+/);
+            if (!match) return 0;
+            const level = parseInt(match[0]);
+            return level;
+        }}
+
+        function isGraduateCourse(courseNumber) {{
+            const level = getCourseLevel(courseNumber);
+            return level >= 6000;
         }}
 
         function createTimeSlots() {{
@@ -1111,11 +1162,40 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
             }}
         }}
 
+        // Level filter dropdown functions
+        function toggleLevelDropdown() {{
+            const dropdown = document.getElementById('levelDropdown');
+            dropdown.classList.toggle('show');
+        }}
+
+        function setLevelFilter(level) {{
+            levelFilter = level;
+            const btnText = document.getElementById('levelBtnText');
+            if (level === 'all') {{
+                btnText.textContent = 'All Levels';
+            }} else if (level === 'undergrad') {{
+                btnText.textContent = 'Undergrad';
+            }} else if (level === 'grad') {{
+                btnText.textContent = 'Grad';
+            }}
+            document.getElementById('levelDropdown').classList.remove('show');
+            applyFilters();
+        }}
+
         function applyFilters() {{
             clearCalendar();
             const filteredCourses = courses.filter(course => {{
                 const instructorMatch = selectedInstructors.size === 0 || selectedInstructors.has(course.instructor);
-                return instructorMatch;
+
+                // Apply level filter
+                let levelMatch = true;
+                if (levelFilter === 'undergrad') {{
+                    levelMatch = !isGraduateCourse(course.course_number);
+                }} else if (levelFilter === 'grad') {{
+                    levelMatch = isGraduateCourse(course.course_number);
+                }}
+
+                return instructorMatch && levelMatch;
             }});
             renderCoursesFiltered(filteredCourses);
             updateFilterStatus();
@@ -1207,6 +1287,15 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
                 statusParts.push('all days');
             }}
 
+            // Add level filter status
+            if (levelFilter === 'undergrad') {{
+                statusParts.push('undergrad only');
+            }} else if (levelFilter === 'grad') {{
+                statusParts.push('grad only');
+            }} else {{
+                statusParts.push('all levels');
+            }}
+
             if (selectedInstructors.size === 0) {{
                 statusParts.push('all instructors');
             }} else if (selectedInstructors.size === 1) {{
@@ -1237,10 +1326,18 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
 
         // Close dropdown when clicking outside
         document.addEventListener('click', function(event) {{
+            // Close instructor dropdown
             const dropdown = document.getElementById('instructorDropdown');
             const btn = document.getElementById('instructorDropdownBtn');
             if (dropdown && btn && !dropdown.contains(event.target) && !btn.contains(event.target)) {{
                 dropdown.classList.remove('show');
+            }}
+
+            // Close level dropdown
+            const levelDropdown = document.getElementById('levelDropdown');
+            const levelBtn = document.getElementById('levelDropdownBtn');
+            if (levelDropdown && levelBtn && !levelDropdown.contains(event.target) && !levelBtn.contains(event.target)) {{
+                levelDropdown.classList.remove('show');
             }}
         }});
 
@@ -1608,7 +1705,7 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
             populateTimePickers();
             populateInstructorDatalist();
             populateEditInstructorFilter();
-            populateEditRoomFilter();
+            populateEditRoomDropdown();
             renderEditCalendar();
             displayEditModeConflicts();
             updateEditCount();
@@ -1657,20 +1754,6 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
         }}
 
         // Populate room filter dropdown in edit mode
-        function populateEditRoomFilter() {{
-            const roomSelect = document.getElementById('editRoomFilter');
-            const rooms = [...new Set(editedCourses.map(c => `${{c.building}} ${{c.room}}`))].sort();
-
-            roomSelect.innerHTML = '<option value="all">All Rooms</option>';
-            rooms.forEach(room => {{
-                if (room.includes('Not specified')) return; // Skip unspecified rooms
-                const option = document.createElement('option');
-                option.value = room;
-                option.textContent = room;
-                roomSelect.appendChild(option);
-            }});
-        }}
-
         // Toggle instructor dropdown in edit mode
         function toggleEditInstructorDropdown() {{
             const dropdown = document.getElementById('editInstructorDropdown');
@@ -1728,6 +1811,62 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
             }}
         }}
 
+        // Edit mode room filter dropdown
+        function toggleEditRoomDropdown() {{
+            const dropdown = document.getElementById('editRoomDropdown');
+            dropdown.style.display = dropdown.style.display === 'block' ? 'none' : 'block';
+        }}
+
+        function setEditRoomFilter(room) {{
+            editRoomFilter = room;
+            const btnText = document.getElementById('editRoomBtnText');
+            btnText.textContent = room === 'all' ? 'All Rooms' : room;
+            document.getElementById('editRoomDropdown').style.display = 'none';
+            applyEditFilters();
+        }}
+
+        function populateEditRoomDropdown() {{
+            const roomSet = new Set();
+            editedCourses.forEach(course => {{
+                if (course.building !== 'Not specified' && course.room !== 'Not specified') {{
+                    roomSet.add(`${{course.building}} ${{course.room}}`);
+                }}
+            }});
+            const rooms = ['all', ...Array.from(roomSet).sort()];
+            const dropdown = document.getElementById('editRoomList');
+            dropdown.innerHTML = '';
+            rooms.forEach(room => {{
+                const item = document.createElement('div');
+                item.className = 'instructor-checkbox-item';
+                item.onclick = () => setEditRoomFilter(room);
+                const label = document.createElement('label');
+                label.style.cursor = 'pointer';
+                label.textContent = room === 'all' ? 'All Rooms' : room;
+                item.appendChild(label);
+                dropdown.appendChild(item);
+            }});
+        }}
+
+        // Edit mode level filter dropdown
+        function toggleEditLevelDropdown() {{
+            const dropdown = document.getElementById('editLevelDropdown');
+            dropdown.style.display = dropdown.style.display === 'block' ? 'none' : 'block';
+        }}
+
+        function setEditLevelFilter(level) {{
+            editLevelFilter = level;
+            const btnText = document.getElementById('editLevelBtnText');
+            if (level === 'all') {{
+                btnText.textContent = 'All Levels';
+            }} else if (level === 'undergrad') {{
+                btnText.textContent = 'Undergrad';
+            }} else if (level === 'grad') {{
+                btnText.textContent = 'Grad';
+            }}
+            document.getElementById('editLevelDropdown').style.display = 'none';
+            applyEditFilters();
+        }}
+
         // Apply edit mode filters
         function applyEditFilters() {{
             // Skip rendering if we're currently importing data
@@ -1736,13 +1875,20 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
                 return;
             }}
 
-            editRoomFilter = document.getElementById('editRoomFilter').value;
-
             // Update status text
             let statusParts = [];
 
             if (editRoomFilter !== 'all') {{
                 statusParts.push(`Room: <strong>${{editRoomFilter}}</strong>`);
+            }}
+
+            // Add level filter status
+            if (editLevelFilter === 'undergrad') {{
+                statusParts.push('<strong>undergrad only</strong>');
+            }} else if (editLevelFilter === 'grad') {{
+                statusParts.push('<strong>grad only</strong>');
+            }} else {{
+                statusParts.push('<strong>all levels</strong>');
             }}
 
             if (editSelectedInstructors.size === 0) {{
@@ -1761,11 +1907,25 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
 
         // Close dropdowns when clicking outside
         document.addEventListener('click', function(event) {{
+            // Close instructor dropdown
             const editDropdown = document.getElementById('editInstructorDropdown');
             const editDropdownBtn = document.getElementById('editInstructorDropdownBtn');
-
             if (editDropdown && !editDropdownBtn.contains(event.target) && !editDropdown.contains(event.target)) {{
                 editDropdown.style.display = 'none';
+            }}
+
+            // Close room dropdown
+            const roomDropdown = document.getElementById('editRoomDropdown');
+            const roomBtn = document.getElementById('editRoomDropdownBtn');
+            if (roomDropdown && roomBtn && !roomDropdown.contains(event.target) && !roomBtn.contains(event.target)) {{
+                roomDropdown.style.display = 'none';
+            }}
+
+            // Close level dropdown
+            const levelDropdown = document.getElementById('editLevelDropdown');
+            const levelBtn = document.getElementById('editLevelDropdownBtn');
+            if (levelDropdown && levelBtn && !levelDropdown.contains(event.target) && !levelBtn.contains(event.target)) {{
+                levelDropdown.style.display = 'none';
             }}
         }});
 
@@ -1839,6 +1999,10 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
                 // Apply room filter
                 const courseRoom = `${{course.building}} ${{course.room}}`;
                 if (editRoomFilter !== 'all' && courseRoom !== editRoomFilter) return;
+
+                // Apply level filter
+                if (editLevelFilter === 'undergrad' && isGraduateCourse(course.course_number)) return;
+                if (editLevelFilter === 'grad' && !isGraduateCourse(course.course_number)) return;
 
                 course.days.split('').forEach(dayLetter => {{
                     const dayName = dayMap[dayLetter];

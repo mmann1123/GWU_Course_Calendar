@@ -727,7 +727,7 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
                     <div class="form-row">
                         <div class="form-group">
                             <label for="editCRNInput">CRN <span class="required">*</span></label>
-                            <input type="text" id="editCRNInput" required maxlength="10" placeholder="12345">
+                            <input type="text" id="editCRNInput" required maxlength="10" placeholder="XXXXX">
                         </div>
                     </div>
 
@@ -750,14 +750,6 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
 
                     <div class="form-group">
                         <label>Days <span class="required">*</span></label>
-                        <select id="editDayPreset" onchange="applyDayPreset()">
-                            <option value="">-- Select Pattern --</option>
-                            <option value="MW">MW (Monday/Wednesday)</option>
-                            <option value="TR">TR (Tuesday/Thursday)</option>
-                            <option value="MWF">MWF (Monday/Wednesday/Friday)</option>
-                            <option value="MTWRF">MTWRF (Every weekday)</option>
-                            <option value="custom">Custom (select below)</option>
-                        </select>
                         <div class="day-checkboxes">
                             <label><input type="checkbox" name="editDay" value="M"> Monday</label>
                             <label><input type="checkbox" name="editDay" value="T"> Tuesday</label>
@@ -1620,11 +1612,6 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
             renderEditCalendar();
             displayEditModeConflicts();
             updateEditCount();
-
-            // Add checkbox change listeners
-            document.querySelectorAll('input[name="editDay"]').forEach(checkbox => {{
-                checkbox.addEventListener('change', syncDayCheckboxes);
-            }});
         }}
 
         // Populate instructor checkboxes in edit mode
@@ -1782,7 +1769,7 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
             }}
         }});
 
-        // Populate time picker dropdowns with 10-minute intervals
+        // Populate time picker dropdowns with 5-minute intervals
         function populateTimePickers() {{
             const startSelect = document.getElementById('editStartTime');
             const endSelect = document.getElementById('editEndTime');
@@ -1791,7 +1778,7 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
 
             const times = [];
             for (let hour = 9; hour <= 21; hour++) {{
-                for (let min = 0; min < 60; min += 10) {{
+                for (let min = 0; min < 60; min += 5) {{
                     const period = hour >= 12 ? 'PM' : 'AM';
                     const displayHour = hour > 12 ? hour - 12 : (hour === 0 ? 12 : hour);
                     const timeStr = `${{displayHour.toString().padStart(2, '0')}}:${{min.toString().padStart(2, '0')}}${{period}}`;
@@ -1817,30 +1804,6 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
             }});
         }}
 
-        // Apply day preset to checkboxes
-        function applyDayPreset() {{
-            const preset = document.getElementById('editDayPreset').value;
-            const checkboxes = document.querySelectorAll('input[name="editDay"]');
-
-            checkboxes.forEach(cb => cb.checked = false);
-
-            if (preset && preset !== 'custom') {{
-                preset.split('').forEach(day => {{
-                    const checkbox = document.querySelector(`input[name="editDay"][value="${{day}}"]`);
-                    if (checkbox) checkbox.checked = true;
-                }});
-            }}
-        }}
-
-        // Sync day checkboxes to preset dropdown
-        function syncDayCheckboxes() {{
-            const checkedDays = Array.from(document.querySelectorAll('input[name="editDay"]:checked'))
-                .map(cb => cb.value).join('');
-            const preset = document.getElementById('editDayPreset');
-
-            const presetMatch = Array.from(preset.options).find(opt => opt.value === checkedDays);
-            preset.value = presetMatch ? checkedDays : 'custom';
-        }}
 
         // Render edit calendar with overlap detection
         function renderEditCalendar() {{
@@ -2192,9 +2155,18 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
             document.getElementById('deleteCourseBtn').style.display = 'none';
             document.getElementById('duplicateCourseBtn').style.display = 'none';
 
-            // Generate new CRN
-            const maxCRN = Math.max(...editedCourses.map(c => parseInt(c.crn) || 0));
-            document.getElementById('editCRNInput').value = (maxCRN + 1).toString();
+            // Set default CRN
+            document.getElementById('editCRNInput').value = 'XXXXX';
+
+            // Set default subject code from existing courses
+            const defaultSubject = editedCourses.length > 0 ? editedCourses[0].subject : '';
+            document.getElementById('editSubject').value = defaultSubject;
+
+            // Set default section
+            document.getElementById('editSection').value = '10';
+
+            // Set default credits
+            document.getElementById('editCredits').value = '3';
 
             document.getElementById('editModal').style.display = 'block';
         }}
@@ -2230,7 +2202,6 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
                     if (checkbox) checkbox.checked = true;
                 }});
             }}
-            syncDayCheckboxes();
 
             document.getElementById('editModal').style.display = 'block';
         }}

@@ -71,6 +71,11 @@ class CourseScraper:
 
             for row in rows:
                 try:
+                    # Skip rows that are hidden with display:none
+                    row_style = row.get('style', '')
+                    if 'display:none' in row_style or 'display: none' in row_style:
+                        continue
+
                     cells = row.find_all('td')
                     if len(cells) < 10:
                         continue

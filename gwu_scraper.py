@@ -536,10 +536,7 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
     </div>
 
     <div class="filter-controls" id="mainCalendarFilters">
-        <span class="filter-text">View:</span>
         <button class="filter-btn" onclick="showAllDays()">Show All Days</button>
-        <span class="filter-text">|</span>
-        <span class="filter-text">Level:</span>
         <div class="instructor-selector-wrapper">
             <button class="filter-btn" id="levelDropdownBtn" onclick="toggleLevelDropdown()">
                 <span id="levelBtnText">All Levels</span> ▼
@@ -558,8 +555,6 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
                 </div>
             </div>
         </div>
-        <span class="filter-text">|</span>
-        <span class="filter-text">Instructors:</span>
         <div class="instructor-selector-wrapper">
             <button class="filter-btn" id="instructorDropdownBtn" onclick="toggleInstructorDropdown()">
                 <span id="instructorBtnText">All Instructors</span> ▼
@@ -631,7 +626,6 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
 
             <!-- Edit Mode Filters -->
             <div class="filter-controls" style="margin: 20px 0;">
-                <span class="filter-text">Room:</span>
                 <div class="instructor-selector-wrapper">
                     <button class="filter-btn" id="editRoomDropdownBtn" onclick="toggleEditRoomDropdown()">
                         <span id="editRoomBtnText">All Rooms</span> ▼
@@ -640,8 +634,6 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
                         <div class="instructor-list" id="editRoomList" style="max-height: 300px;"></div>
                     </div>
                 </div>
-                <span class="filter-text">|</span>
-                <span class="filter-text">Level:</span>
                 <div class="instructor-selector-wrapper">
                     <button class="filter-btn" id="editLevelDropdownBtn" onclick="toggleEditLevelDropdown()">
                         <span id="editLevelBtnText">All Levels</span> ▼
@@ -660,8 +652,6 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
                         </div>
                     </div>
                 </div>
-                <span class="filter-text">|</span>
-                <span class="filter-text">Instructors:</span>
                 <div class="instructor-selector-wrapper">
                     <button class="filter-btn" id="editInstructorDropdownBtn" onclick="toggleEditInstructorDropdown()">
                         <span id="editInstructorBtnText">All Instructors</span> ▼

@@ -11,6 +11,7 @@ from typing import List, Dict, Optional
 import json
 import sys
 import argparse
+import base64
 from datetime import datetime
 
 
@@ -702,6 +703,9 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
                     📤 Import CSV
                 </button>
                 <input type="file" id="csvFileInput" accept=".csv" style="display: none;" onchange="handleCSVImport(event)">
+                <button class="edit-action-btn btn-primary" onclick="exportEditedCalendar()">
+                    📄 Export Edited Calendar
+                </button>
             </div>
 
             <!-- Edit Mode Conflicts Section -->
@@ -2769,6 +2773,36 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
             showToast('💾 JSON saved successfully!', 'success');
         }}
 
+        // Export edited calendar using embedded template (base64 encoded)
+        function exportEditedCalendar() {{
+            // Prompt for filename
+            const defaultName = `edited_calendar_${{new Date().toISOString().slice(0,10)}}.html`;
+            const filename = prompt('Enter filename for the exported calendar:', defaultName);
+            if (!filename) return;
+
+            const finalFilename = filename.endsWith('.html') ? filename : filename + '.html';
+
+            // Decode the base64 template (with proper UTF-8 handling)
+            const template = decodeURIComponent(escape(atob(EXPORT_TEMPLATE_B64)));
+
+            // Replace placeholder with edited courses
+            const exportHTML = template.replace(
+                '__COURSES_DATA_PLACEHOLDER__',
+                JSON.stringify(editedCourses)
+            );
+
+            // Download the file
+            const blob = new Blob([exportHTML], {{ type: 'text/html' }});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = finalFilename;
+            a.click();
+            URL.revokeObjectURL(url);
+
+            showToast(`📄 Calendar exported as ${{finalFilename}}`, 'success');
+        }}
+
         // Show toast notification
         function showToast(message, type) {{
             const toast = document.createElement('div');
@@ -2837,10 +2871,24 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
     </footer>
 </body>
 </html>'''
-    
+
+    # Create embedded template for export functionality using base64 encoding
+    # First create a template version with placeholder for courses
+    template_for_embed = html_template.replace(courses_json, '__COURSES_DATA_PLACEHOLDER__')
+
+    # Encode as base64 to avoid any escaping issues
+    template_base64 = base64.b64encode(template_for_embed.encode('utf-8')).decode('ascii')
+
+    # Insert the EXPORT_TEMPLATE_B64 constant before 'const courses ='
+    template_constant = f'const EXPORT_TEMPLATE_B64 = "{template_base64}";\n        '
+    html_template = html_template.replace(
+        'const courses = ',
+        template_constant + 'const courses = '
+    )
+
     with open(output_file, 'w', encoding='utf-8') as f:
         f.write(html_template)
-    
+
     print(f"✓ Calendar saved to: {output_file}")
 
 

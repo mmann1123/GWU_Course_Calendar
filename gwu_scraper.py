@@ -696,15 +696,12 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
             </div>
 
             <div class="edit-toolbar-bottom">
-                <button class="edit-action-btn btn-export" onclick="exportToCSV()">
-                    📥 Export to CSV
-                </button>
                 <button class="edit-action-btn btn-import" onclick="document.getElementById('csvFileInput').click()">
                     📤 Import CSV
                 </button>
                 <input type="file" id="csvFileInput" accept=".csv" style="display: none;" onchange="handleCSVImport(event)">
-                <button class="edit-action-btn btn-primary" onclick="exportEditedCalendar()">
-                    📄 Export Edited Calendar
+                <button class="edit-action-btn btn-primary" onclick="exportSchedule()">
+                    📦 Export Schedule
                 </button>
             </div>
 
@@ -2801,6 +2798,62 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
             URL.revokeObjectURL(url);
 
             showToast(`📄 Calendar exported as ${{finalFilename}}`, 'success');
+        }}
+
+        // Helper function to download a file
+        function downloadFile(content, filename, mimeType) {{
+            const blob = new Blob([content], {{ type: mimeType }});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(url);
+        }}
+
+        // Export schedule - downloads HTML, CSV, and JSON
+        function exportSchedule() {{
+            // Prompt for base filename
+            const defaultName = `schedule_${{new Date().toISOString().slice(0,10)}}`;
+            const baseName = prompt('Enter base filename (will create .html, .csv, and .json files):', defaultName);
+            if (!baseName) return;
+
+            // 1. Export HTML calendar
+            const template = decodeURIComponent(escape(atob(EXPORT_TEMPLATE_B64)));
+            const exportHTML = template.replace(
+                '__COURSES_DATA_PLACEHOLDER__',
+                JSON.stringify(editedCourses)
+            );
+            downloadFile(exportHTML, baseName + '.html', 'text/html');
+
+            // 2. Export CSV
+            const sortedCourses = [...editedCourses].sort((a, b) => {{
+                const instructorCompare = (a.instructor || '').localeCompare(b.instructor || '');
+                if (instructorCompare !== 0) return instructorCompare;
+                return (a.course_number || '').localeCompare(b.course_number || '');
+            }});
+            const headers = ['CRN', 'Subject', 'CourseNum', 'Section', 'Title', 'Credits', 'Instructor', 'Days', 'StartTime', 'EndTime', 'Building', 'Room', 'Dates'];
+            const rows = sortedCourses.map(c => [
+                c.crn, c.subject, c.course_num, c.section, c.title, c.credits,
+                c.instructor, c.days, c.time.start, c.time.end, c.building, c.room, c.dates
+            ]);
+            const csvContent = [
+                headers.join(','),
+                ...rows.map(row => row.map(cell => {{
+                    const cellStr = (cell || '').toString();
+                    if (cellStr.includes(',') || cellStr.includes('"') || cellStr.includes('\\n')) {{
+                        return `"${{cellStr.replace(/"/g, '""')}}"`;
+                    }}
+                    return cellStr;
+                }}).join(','))
+            ].join('\\n');
+            downloadFile(csvContent, baseName + '.csv', 'text/csv');
+
+            // 3. Export JSON
+            const json = JSON.stringify(editedCourses, null, 2);
+            downloadFile(json, baseName + '.json', 'application/json');
+
+            showToast(`📦 Exported: ${{baseName}}.html, .csv, .json`, 'success');
         }}
 
         // Show toast notification

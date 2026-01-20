@@ -2606,7 +2606,7 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
                     const section = values[3]?.trim();
                     const title = values[4]?.trim();
                     const credits = values[5]?.trim() || '0.00';
-                    const instructor = values[6]?.trim();
+                    const instructor = values[6]?.trim() || 'TBA';
                     const days = values[7]?.trim() || 'MW';
                     const startTime = values[8]?.trim() || '09:00AM';
                     const endTime = values[9]?.trim() || '10:00AM';
@@ -2614,8 +2614,8 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
                     const room = values[11]?.trim() || 'Not specified';
                     const dates = values[12]?.trim() || '01/12/26 - 04/27/26';
 
-                    if (!crn || !title || !instructor) {{
-                        console.warn(`Skipping row ${{i}}: missing required fields - CRN=${{crn}}, Title=${{title}}, Instructor=${{instructor}}`);
+                    if (!crn || !title) {{
+                        console.warn(`Skipping row ${{i}}: missing required fields - CRN=${{crn}}, Title=${{title}}`);
                         continue;
                     }}
 
@@ -2625,9 +2625,9 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
                         continue;
                     }}
 
-                    // Validate days format
-                    if (!days.match(/^[MTWRF]+$/)) {{
-                        console.warn(`Skipping row ${{i}}: invalid days format - Days=${{days}}`);
+                    // Skip courses without scheduled meeting times (e.g., independent study, research)
+                    if (!days || !days.match(/^[MTWRF]+$/)) {{
+                        console.warn(`Skipping row ${{i}}: no scheduled meeting days - Days=${{days}} (likely independent study/research)`);
                         continue;
                     }}
 
@@ -2675,45 +2675,25 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
                 }}
 
                 if (confirm(`Import ${{imported.length}} courses? This will REPLACE all current courses in edit mode.`)) {{
-                    console.log('=== CSV IMPORT: REPLACING editedCourses ===');
-                    console.log('Old editedCourses length:', editedCourses.length);
-                    console.log('New imported length:', imported.length);
-
                     // Set flag to prevent multiple renders during import
                     isImporting = true;
 
-                    // REPLACE all courses with imported data (not merge)
+                    // REPLACE all courses with imported data
                     editedCourses = imported;
                     editedCRNs.clear();
-
-                    // Mark all imported courses as edited
                     imported.forEach(course => {{
                         editedCRNs.add(course.crn);
                     }});
 
-                    console.log('After replacement - editedCourses length:', editedCourses.length);
-                    console.log('After replacement - editedCourses === imported?', editedCourses === imported);
-
-                    // Verify first 3 courses in editedCourses
-                    console.log('=== FIRST 3 COURSES IN editedCourses ===');
-                    editedCourses.slice(0, 3).forEach((c, idx) => {{
-                        console.log(`[${{idx}}] CRN ${{c.crn}}: ${{c.days}} ${{c.time.start}}-${{c.time.end}} | ${{c.course_number}} ${{c.title}}`);
-                    }});
-
                     editCount = imported.length;
-                    updateEditCount();
-                    populateEditInstructorFilter();
-                    populateEditRoomFilter();
-
-                    // Clear the flag before rendering
                     isImporting = false;
 
-                    // Now render once
-                    console.log('CSV Import: Rendering calendar once...');
-                    renderEditCalendar();
-                    displayEditModeConflicts();
-                    populateInstructorDatalist();
-                    showToast(`📤 Imported ${{imported.length}} courses successfully!`, 'success');
+                    // Force refresh by switching tabs away and back
+                    switchTab('room-conflicts');
+                    setTimeout(() => {{
+                        switchTab('edit-schedule');
+                        showToast(`Imported ${{imported.length}} courses successfully!`, 'success');
+                    }}, 100);
                 }}
             }};
             reader.readAsText(file);

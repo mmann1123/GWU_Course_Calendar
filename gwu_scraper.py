@@ -1034,12 +1034,17 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
             const instructorColor = getInstructorColor(course.instructor);
             courseBlock.style.background = instructorColor;
 
-            // Check if this course has a room conflict
-            const hasConflict = roomConflicts.some(conflict =>
+            // Check if this course has a room conflict (and it's not ignored)
+            const courseConflict = roomConflicts.find(conflict =>
                 conflict.courses.some(c => c.crn === course.crn)
             );
-            if (hasConflict) {{
-                courseBlock.classList.add('conflict-indicator');
+            if (courseConflict) {{
+                // Generate the conflict signature to check if it's ignored
+                const crns = courseConflict.courses.map(c => c.crn).sort().join('-');
+                const conflictSig = `${{courseConflict.room}}_${{courseConflict.courses[0].days}}_${{courseConflict.courses[0].time.start}}_${{crns}}`;
+                if (!ignoredConflicts.has(conflictSig)) {{
+                    courseBlock.classList.add('conflict-indicator');
+                }}
             }}
 
             courseBlock.innerHTML = `
@@ -1454,6 +1459,16 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
 
                         if (sharedDays.length === 0) continue;
 
+                        // Skip cross-listed courses (same title, time, instructor, days)
+                        // These are intentionally scheduled together
+                        if (course1.title === course2.title &&
+                            course1.time.start === course2.time.start &&
+                            course1.time.end === course2.time.end &&
+                            course1.instructor === course2.instructor &&
+                            course1.days === course2.days) {{
+                            continue;
+                        }}
+
                         // Check if times overlap
                         const start1 = timeToMinutes(course1.time.start);
                         const end1 = timeToMinutes(course1.time.end);
@@ -1626,6 +1641,9 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
 
             // Refresh the display to update button and counter
             detectAndDisplayRoomConflicts();
+
+            // Re-render the main calendar to update conflict indicators
+            renderCourses();
         }}
 
         // Reset all ignored conflicts
@@ -1637,6 +1655,7 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
             ignoredConflicts.clear();
             localStorage.removeItem('ignoredConflicts');
             detectAndDisplayRoomConflicts();
+            renderCourses();
             showToast('↶ All ignored conflicts have been reset', 'info');
         }}
 
@@ -2189,6 +2208,16 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
                         const sharedDays = days1.filter(d => days2.includes(d));
 
                         if (sharedDays.length === 0) continue;
+
+                        // Skip cross-listed courses (same title, time, instructor, days)
+                        // These are intentionally scheduled together
+                        if (course1.title === course2.title &&
+                            course1.time.start === course2.time.start &&
+                            course1.time.end === course2.time.end &&
+                            course1.instructor === course2.instructor &&
+                            course1.days === course2.days) {{
+                            continue;
+                        }}
 
                         // Check if times overlap
                         const start1 = timeToMinutes(course1.time.start);

@@ -1,6 +1,5 @@
-name: Build Executables                                                                            
-                                                                                                     
-  on:                                                                                                
+name: Build Executables                                                                                                                                                  
+on:                                                                                                
     workflow_dispatch:  # Manual trigger                                                             
     push:                                                                                            
       branches:                                                                                      

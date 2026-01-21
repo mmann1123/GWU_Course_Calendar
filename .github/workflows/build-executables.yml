@@ -1,16 +1,11 @@
 name: Build Executables                                                                                                                                                  
 on:                                                                                                
-    workflow_dispatch:  # Manual trigger                                                             
+    workflow_dispatch:                                                                               
     push:                                                                                            
       branches:                                                                                      
         - main                                                                                       
-      paths:                                                                                         
-        - 'gwu_scraper*.py'                                                                          
-        - 'requirements.txt'                                                                         
-        - 'docs/**'                                                                                  
       tags:                                                                                          
-        - 'v*'                                                                                       
-                                                                                                     
+        - 'v*'                                                                                  
   permissions:                                                                                       
     contents: read                                                                                   
     pages: write                                                                                     

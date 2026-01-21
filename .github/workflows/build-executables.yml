@@ -1,139 +1,138 @@
-name: Build Executables                                                                                                                                                  
-on:                                                                                                
-    workflow_dispatch:                                                                               
-    push:                                                                                            
-      branches:                                                                                      
-        - main                                                                                       
-      tags:                                                                                          
-        - 'v*'                                                                                  
-  permissions:                                                                                       
-    contents: read                                                                                   
-    pages: write                                                                                     
-    id-token: write                                                                                  
-                                                                                                     
-  concurrency:                                                                                       
-    group: "pages"                                                                                   
-    cancel-in-progress: false                                                                        
-                                                                                                     
-  jobs:                                                                                              
-    build-windows:                                                                                   
-      runs-on: windows-latest                                                                        
-      steps:                                                                                         
-        - uses: actions/checkout@v4                                                                  
-        - name: Set up Python                                                                        
-          uses: actions/setup-python@v5                                                              
-          with:                                                                                      
-            python-version: '3.11'                                                                   
-        - name: Install dependencies                                                                 
-          run: |                                                                                     
-            python -m pip install --upgrade pip                                                      
-            pip install -r requirements.txt                                                          
-            pip install pyinstaller pillow                                                           
-        - name: Convert PNG to ICO                                                                   
-          run: |                                                                                     
-            python -c "from PIL import Image; img = Image.open('static/course_scraper.png');         
-  img.save('icon.ico', format='ICO', sizes=[(256,256), (128,128), (64,64), (32,32), (16,16)])"       
-        - name: Build Windows executable                                                             
-          run: |                                                                                     
-            pyinstaller --onefile --windowed --name "GWU_Course_Calendar" --icon icon.ico            
-  gwu_scraper_gui.py                                                                                 
-        - name: Upload Windows artifact                                                              
-          uses: actions/upload-artifact@v4                                                           
-          with:                                                                                      
-            name: GWU_Course_Calendar-Windows                                                        
-            path: dist/GWU_Course_Calendar.exe                                                       
-                                                                                                     
-    build-macos:                                                                                     
-      runs-on: macos-latest                                                                          
-      steps:                                                                                         
-        - uses: actions/checkout@v4                                                                  
-        - name: Set up Python                                                                        
-          uses: actions/setup-python@v5                                                              
-          with:                                                                                      
-            python-version: '3.11'                                                                   
-        - name: Install dependencies                                                                 
-          run: |                                                                                     
-            python -m pip install --upgrade pip                                                      
-            pip install -r requirements.txt                                                          
-            pip install pyinstaller pillow                                                           
-        - name: Convert PNG to ICNS                                                                  
-          run: |                                                                                     
-            mkdir -p icon.iconset                                                                    
-            sips -z 16 16 static/course_scraper.png --out icon.iconset/icon_16x16.png                
-            sips -z 32 32 static/course_scraper.png --out icon.iconset/icon_16x16@2x.png             
-            sips -z 32 32 static/course_scraper.png --out icon.iconset/icon_32x32.png                
-            sips -z 64 64 static/course_scraper.png --out icon.iconset/icon_32x32@2x.png             
-            sips -z 128 128 static/course_scraper.png --out icon.iconset/icon_128x128.png            
-            sips -z 256 256 static/course_scraper.png --out icon.iconset/icon_128x128@2x.png         
-            sips -z 256 256 static/course_scraper.png --out icon.iconset/icon_256x256.png            
-            sips -z 512 512 static/course_scraper.png --out icon.iconset/icon_256x256@2x.png         
-            sips -z 512 512 static/course_scraper.png --out icon.iconset/icon_512x512.png            
-            sips -z 1024 1024 static/course_scraper.png --out icon.iconset/icon_512x512@2x.png       
-            iconutil -c icns icon.iconset -o icon.icns                                               
-        - name: Build macOS executable                                                               
-          run: |                                                                                     
-            pyinstaller --onefile --windowed --name "GWU_Course_Calendar" --icon icon.icns           
-  gwu_scraper_gui.py                                                                                 
-        - name: Upload macOS artifact                                                                
-          uses: actions/upload-artifact@v4                                                           
-          with:                                                                                      
-            name: GWU_Course_Calendar-macOS                                                          
-            path: dist/GWU_Course_Calendar                                                           
-                                                                                                     
-    create-release:                                                                                  
-      needs: [build-windows, build-macos]                                                            
-      runs-on: ubuntu-latest                                                                         
-      if: startsWith(github.ref, 'refs/tags/')                                                       
-      steps:                                                                                         
-        - name: Download Windows artifact                                                            
-          uses: actions/download-artifact@v4                                                         
-          with:                                                                                      
-            name: GWU_Course_Calendar-Windows                                                        
-            path: windows                                                                            
-        - name: Download macOS artifact                                                              
-          uses: actions/download-artifact@v4                                                         
-          with:                                                                                      
-            name: GWU_Course_Calendar-macOS                                                          
-            path: macos                                                                              
-        - name: Create Release                                                                       
-          uses: softprops/action-gh-release@v1                                                       
-          with:                                                                                      
-            files: |                                                                                 
-              windows/GWU_Course_Calendar.exe                                                        
-              macos/GWU_Course_Calendar                                                              
-            generate_release_notes: true                                                             
-                                                                                                     
-    deploy-pages:                                                                                    
-      needs: [build-windows, build-macos]                                                            
-      runs-on: ubuntu-latest                                                                         
-      environment:                                                                                   
-        name: github-pages                                                                           
-        url: ${{ steps.deployment.outputs.page_url }}                                                
-      steps:                                                                                         
-        - name: Checkout                                                                             
-          uses: actions/checkout@v4                                                                  
-        - name: Download Windows artifact                                                            
-          uses: actions/download-artifact@v4                                                         
-          with:                                                                                      
-            name: GWU_Course_Calendar-Windows                                                        
-            path: temp-windows                                                                       
-        - name: Download macOS artifact                                                              
-          uses: actions/download-artifact@v4                                                         
-          with:                                                                                      
-            name: GWU_Course_Calendar-macOS                                                          
-            path: temp-macos                                                                         
-        - name: Prepare Pages content                                                                
-          run: |                                                                                     
-            mkdir -p docs/downloads                                                                  
-            cd temp-windows && zip -r ../docs/downloads/GWU_Course_Calendar-Windows.zip . && cd ..   
-            cd temp-macos && zip -r ../docs/downloads/GWU_Course_Calendar-macOS.zip . && cd ..       
-            ls -la docs/downloads/                                                                   
-        - name: Setup Pages                                                                          
-          uses: actions/configure-pages@v4                                                           
-        - name: Upload artifact                                                                      
-          uses: actions/upload-pages-artifact@v3                                                     
-          with:                                                                                      
-            path: './docs'                                                                           
-        - name: Deploy to GitHub Pages                                                               
-          id: deployment                                                                             
-          uses: actions/deploy-pages@v4     
+name: Build Executables
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller pillow
+      - name: Convert PNG to ICO
+        run: |
+          python -c "from PIL import Image; img = Image.open('static/course_scraper.png'); img.save('icon.ico', format='ICO', sizes=[(256,256), (128,128), (64,64), (32,32), (16,16)])"
+      - name: Build Windows executable
+        run: |
+          pyinstaller --onefile --windowed --name "GWU_Course_Calendar" --icon icon.ico gwu_scraper_gui.py
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: GWU_Course_Calendar-Windows
+          path: dist/GWU_Course_Calendar.exe
+
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller pillow
+      - name: Convert PNG to ICNS
+        run: |
+          mkdir -p icon.iconset
+          sips -z 16 16 static/course_scraper.png --out icon.iconset/icon_16x16.png
+          sips -z 32 32 static/course_scraper.png --out icon.iconset/icon_16x16@2x.png
+          sips -z 32 32 static/course_scraper.png --out icon.iconset/icon_32x32.png
+          sips -z 64 64 static/course_scraper.png --out icon.iconset/icon_32x32@2x.png
+          sips -z 128 128 static/course_scraper.png --out icon.iconset/icon_128x128.png
+          sips -z 256 256 static/course_scraper.png --out icon.iconset/icon_128x128@2x.png
+          sips -z 256 256 static/course_scraper.png --out icon.iconset/icon_256x256.png
+          sips -z 512 512 static/course_scraper.png --out icon.iconset/icon_256x256@2x.png
+          sips -z 512 512 static/course_scraper.png --out icon.iconset/icon_512x512.png
+          sips -z 1024 1024 static/course_scraper.png --out icon.iconset/icon_512x512@2x.png
+          iconutil -c icns icon.iconset -o icon.icns
+      - name: Build macOS executable
+        run: |
+          pyinstaller --onefile --windowed --name "GWU_Course_Calendar" --icon icon.icns gwu_scraper_gui.py
+      - name: Upload macOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: GWU_Course_Calendar-macOS
+          path: dist/GWU_Course_Calendar
+
+  create-release:
+    needs: [build-windows, build-macos]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - name: Download Windows artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: GWU_Course_Calendar-Windows
+          path: windows
+      - name: Download macOS artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: GWU_Course_Calendar-macOS
+          path: macos
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            windows/GWU_Course_Calendar.exe
+            macos/GWU_Course_Calendar
+          generate_release_notes: true
+
+  deploy-pages:
+    needs: [build-windows, build-macos]
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Download Windows artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: GWU_Course_Calendar-Windows
+          path: temp-windows
+      - name: Download macOS artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: GWU_Course_Calendar-macOS
+          path: temp-macos
+      - name: Prepare Pages content
+        run: |
+          mkdir -p docs/downloads
+          cd temp-windows && zip -r ../docs/downloads/GWU_Course_Calendar-Windows.zip . && cd ..
+          cd temp-macos && zip -r ../docs/downloads/GWU_Course_Calendar-macOS.zip . && cd ..
+          ls -la docs/downloads/
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: './docs'
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

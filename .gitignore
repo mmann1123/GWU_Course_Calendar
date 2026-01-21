@@ -1,3 +1,7 @@
 __pycache__/gwu_scraper.cpython-39.pyc
 *.html
 *.json
+
+# Allow docs folder for GitHub Pages
+!docs/
+!docs/**

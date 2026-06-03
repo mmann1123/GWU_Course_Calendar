@@ -290,9 +290,39 @@ python gwu_scraper.py --url "https://my.gwu.edu/mod/pws/courses.cfm?campId=1&ter
 # Custom output filename
 python gwu_scraper.py --output my_calendar.html --json my_data.json
 
+# Import the registrar's .xlsx schedule instead of scraping
+python gwu_scraper.py --xlsx-in "G&E Schedule - Spring 2027.xlsx"
+
+# Export the schedule back to the registrar's .xlsx format
+python gwu_scraper.py --xlsx-in schedule.xlsx --xlsx-out updated_schedule.xlsx
+
 # Show all options
 python gwu_scraper.py --help
 ```
+
+### Registrar Spreadsheet Import / Export
+
+Departments can work directly with the GWU registrar's `.xlsx` schedule format
+(the *G&E Schedule* "Export" layout) instead of scraping the public website.
+
+In the **GUI**, use the **Registrar Spreadsheet (.xlsx)** buttons:
+
+- **📥 Import .xlsx → Calendar** — load a registrar schedule and view it as a calendar.
+- **📤 Export Calendar → .xlsx** — write the current schedule back to the registrar's column layout for submission.
+
+The import/export is **round-trip safe**: registrar-only columns (instructor
+GWID, enrollment counts, comments, special-topics section titles, start/end
+dates) are preserved so an imported file can be exported again without losing
+data. A few notes:
+
+- Times convert between the registrar's 24-hour `HHMM` and the calendar's
+  12-hour display automatically.
+- Arranged / **TBA** courses (Thesis, Internship, Readings — no meeting time)
+  are kept in the data but not drawn on the calendar grid.
+- **Status** (Open/Closed) is derived from enrollment vs. capacity.
+- Fields the registrar sheet doesn't include — **CRN**, **building**, and
+  **room** — are left as *Not specified* (room assignment happens after this
+  scheduling stage).
 
 ---
 

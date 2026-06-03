@@ -2954,11 +2954,15 @@ def main():
                        default="https://my.gwu.edu/mod/pws/courses.cfm?campId=1&termId=202601&subjId=GEOG",
                        help='URL to scrape')
     parser.add_argument('--text-file', type=str, help='Text file to parse instead of URL')
+    parser.add_argument('--xlsx-in', type=str,
+                       help="Read courses from a registrar-format .xlsx file instead of scraping")
+    parser.add_argument('--xlsx-out', type=str,
+                       help="Also write the courses to a registrar-format .xlsx file")
     parser.add_argument('--output', type=str, default='gwu_course_calendar.html',
                        help='Output HTML file')
     parser.add_argument('--json', type=str, default='courses_data.json',
                        help='Output JSON file')
-    
+
     args = parser.parse_args()
     
     print("\n" + "="*70)
@@ -2966,35 +2970,54 @@ def main():
     print("="*70 + "\n")
     
     try:
-        if args.text_file:
+        if args.xlsx_in:
+            import registrar_io
+            print(f"Reading registrar file: {args.xlsx_in}\n")
+            courses = registrar_io.read_registrar_xlsx(args.xlsx_in)
+            timed = sum(1 for c in courses if c.get('time'))
+            print(f"✓ Read {len(courses)} courses "
+                  f"({timed} scheduled, {len(courses) - timed} arranged/TBA)")
+        elif args.text_file:
             with open(args.text_file, 'r', encoding='utf-8') as f:
                 text_content = f.read()
             scraper = CourseScraper(text_content=text_content)
+            print("Starting scrape...\n")
+            courses = scraper.scrape()
         else:
             scraper = CourseScraper(url=args.url)
-        
-        print("Starting scrape...\n")
-        courses = scraper.scrape()
-        
+            print("Starting scrape...\n")
+            courses = scraper.scrape()
+
         if len(courses) == 0:
             print("\n⚠️  WARNING: No courses found!")
-            print("   Try saving the webpage and using --text-file")
+            if not args.xlsx_in:
+                print("   Try saving the webpage and using --text-file")
             return 1
-        
+
         print()
-        scraper.save_to_json(args.json)
+        with open(args.json, 'w', encoding='utf-8') as f:
+            json.dump(courses, f, indent=2)
+        print(f"✓ Saved raw data to: {args.json}")
+
+        # Optionally export to the registrar's .xlsx format.
+        if args.xlsx_out:
+            import registrar_io
+            registrar_io.write_registrar_xlsx(courses, args.xlsx_out)
+            print(f"✓ Wrote registrar file: {args.xlsx_out}")
 
         # Extract year and semester from URL if available
         year = None
         semester = None
-        if args.url and 'termId=' in args.url:
+        if not args.xlsx_in and args.url and 'termId=' in args.url:
             import re
             term_match = re.search(r'termId=(\d{4})(\d{2})', args.url)
             if term_match:
                 year = term_match.group(1)
                 semester = term_match.group(2)
 
-        generate_html_calendar(courses, args.output, year=year, semester=semester)
+        # Only scheduled courses can be placed on the calendar grid.
+        calendar_courses = [c for c in courses if c.get('time')]
+        generate_html_calendar(calendar_courses, args.output, year=year, semester=semester)
 
         print("\n" + "="*70)
         print("✅ SUCCESS!")

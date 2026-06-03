@@ -1,4 +1,5 @@
-__pycache__/gwu_scraper.cpython-39.pyc
+__pycache__/
+*.pyc
 *.html
 *.json
 

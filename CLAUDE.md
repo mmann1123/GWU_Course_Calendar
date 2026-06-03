@@ -48,6 +48,12 @@ python gwu_scraper.py --text-file gwu_courses.html
 # Custom output filenames
 python gwu_scraper.py --output my_calendar.html --json my_data.json
 
+# Import the registrar's .xlsx schedule instead of scraping
+python gwu_scraper.py --xlsx-in "G&E Schedule - Spring 2027.xlsx"
+
+# Export to the registrar's .xlsx format (combine with --xlsx-in or a scrape)
+python gwu_scraper.py --xlsx-in schedule.xlsx --xlsx-out updated.xlsx
+
 # Show help and all options
 python gwu_scraper.py --help
 ```
@@ -344,9 +350,50 @@ const startHour = 9;   // 9 AM
 const endHour = 21;    // 9 PM
 ```
 
+## Registrar .xlsx Import/Export (`registrar_io.py`)
+
+Departments can read and write the GWU registrar's schedule `.xlsx` format (the
+*G&E Schedule* "Export" layout) in addition to scraping the website. This is a
+standalone module with no dependency on `CourseScraper`.
+
+- `read_registrar_xlsx(path)` → list of course dicts (same shape the scraper
+  produces, plus registrar-only pass-through fields). Matches columns by header
+  name, so it tolerates reordering. Returns **all** rows including arranged/TBA
+  courses (those get `time=None`).
+- `write_registrar_xlsx(courses, path)` → writes the 18-column registrar layout,
+  preferring preserved pass-through fields and deriving the rest.
+
+**Registrar columns** (header row): Changes, Subject Code, Course Number, Course,
+Section Title, Instructor GWID, Instructor Last/First Name, Credits, Max/Prior
+Enrollment, Wait Capacity, Course Start/End Date, Weekly Meeting Pattern, Begin/End
+Time HHMM, Comment.
+
+**Round-trip design** — extra fields are stored on each course dict so an
+imported file can be exported unchanged: `gwid`, `instructor_last`,
+`instructor_first`, `section_title`, `max_enrollment`, `prior_enrollment`,
+`wait_capacity`, `comment`, `course_start_date`/`course_end_date` (ISO),
+`source='registrar'`, `synthetic_crn`.
+
+**Conversions / asymmetries:**
+- Time: registrar 24h `HHMM` (`'1420'`) ↔ dashboard 12h (`'02:20PM'`).
+  `'####'`/blank → TBA (`time=None`); those rows are filtered out of the calendar
+  HTML but kept in the JSON.
+- Instructor: `Last`+`First` → `'Chacko, E'`; reverse recovers last name + first
+  initial only (full first name is lost on a scrape→registrar write).
+- Status (OPEN/CLOSED) is **derived**: `prior_enrollment >= max_enrollment` → CLOSED.
+- Registrar sheet has **no CRN / building / room** — import sets a synthetic CRN
+  (`R0001`…, to keep the dashboard's conflict/dedup logic working) and
+  `'Not specified'` for location.
+- Special-topics subtitle (Section Title) is folded into the display `title` as
+  `"Course - Section Title"` and split back out on export.
+
+Wired into both interfaces: CLI flags `--xlsx-in` / `--xlsx-out` in
+`gwu_scraper.py:main()`, and Import/Export buttons in `gwu_scraper_gui.py`.
+
 ## Dependencies
 
 - `beautifulsoup4>=4.9.0` - HTML parsing (BeautifulSoup)
 - `requests>=2.25.0` - HTTP requests
+- `openpyxl>=3.0.0` - Reading/writing the registrar `.xlsx` format (`registrar_io.py`)
 
-Both are lightweight and widely used. The scraper uses BeautifulSoup primarily for `.get_text()` extraction, then relies on regex for parsing (not DOM traversal).
+All are lightweight and widely used. The scraper uses BeautifulSoup primarily for `.get_text()` extraction, then relies on regex for parsing (not DOM traversal).

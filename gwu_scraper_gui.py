@@ -5,7 +5,8 @@ Provides a graphical interface for scraping GWU course schedules
 """
 
 import tkinter as tk
-from tkinter import ttk, scrolledtext, messagebox
+from tkinter import ttk, scrolledtext, messagebox, filedialog
+import json
 import threading
 import sys
 import os
@@ -13,6 +14,7 @@ from datetime import datetime
 
 # Import the scraper components
 from gwu_scraper import CourseScraper, generate_html_calendar
+import registrar_io
 
 
 class ScraperGUI:
@@ -24,6 +26,7 @@ class ScraperGUI:
 
         # Variables
         self.is_scraping = False
+        self.courses = None  # most recently scraped or imported courses
 
         # Create UI
         self.create_widgets()
@@ -104,17 +107,36 @@ class ScraperGUI:
                                         command=self.open_github_issues)
         self.report_button.grid(row=0, column=2, padx=5)
 
+        # Registrar .xlsx Import/Export row
+        registrar_frame = ttk.LabelFrame(main_frame, text="Registrar Spreadsheet (.xlsx)",
+                                         padding="8")
+        registrar_frame.grid(row=7, column=0, columnspan=3, pady=(0, 10),
+                             sticky=(tk.W, tk.E))
+
+        self.import_button = ttk.Button(registrar_frame, text="📥 Import .xlsx → Calendar",
+                                        command=self.import_xlsx)
+        self.import_button.grid(row=0, column=0, padx=5)
+
+        self.export_button = ttk.Button(registrar_frame, text="📤 Export Calendar → .xlsx",
+                                        command=self.export_xlsx)
+        self.export_button.grid(row=0, column=1, padx=5)
+
+        registrar_hint = ttk.Label(registrar_frame,
+                                   text="Read/write the GWU registrar's schedule format",
+                                   font=('Arial', 8), foreground='gray')
+        registrar_hint.grid(row=1, column=0, columnspan=2, sticky=tk.W, pady=(4, 0))
+
         # Progress Label
         self.progress_label = ttk.Label(main_frame, text="", font=('Arial', 10))
-        self.progress_label.grid(row=7, column=0, columnspan=3, pady=(0, 10))
+        self.progress_label.grid(row=8, column=0, columnspan=3, pady=(0, 10))
 
         # Output Text Area
-        ttk.Label(main_frame, text="Output:", font=('Arial', 10, 'bold')).grid(row=8, column=0, sticky=tk.W, pady=(10, 5))
+        ttk.Label(main_frame, text="Output:", font=('Arial', 10, 'bold')).grid(row=9, column=0, sticky=tk.W, pady=(10, 5))
 
         self.output_text = scrolledtext.ScrolledText(main_frame, height=15, width=60,
                                                       wrap=tk.WORD, font=('Courier', 9))
-        self.output_text.grid(row=9, column=0, columnspan=3, sticky=(tk.W, tk.E, tk.N, tk.S), pady=5)
-        main_frame.rowconfigure(9, weight=1)
+        self.output_text.grid(row=10, column=0, columnspan=3, sticky=(tk.W, tk.E, tk.N, tk.S), pady=5)
+        main_frame.rowconfigure(10, weight=1)
 
         # Status Bar
         self.status_bar = ttk.Label(self.root, text="Ready", relief=tk.SUNKEN, anchor=tk.W)
@@ -229,6 +251,7 @@ class ScraperGUI:
             output_json = output_html.replace('.html', '.json')
 
             scraper.save_to_json(output_json)
+            self.courses = courses  # keep for registrar export
             self.log(f"\n✓ Saved raw data to: {output_json}")
 
             # Get year and semester for HTML title
@@ -265,6 +288,106 @@ class ScraperGUI:
             self.is_scraping = False
             self.scrape_button.config(state='normal')
             self.cancel_button.config(state='disabled')
+
+    def import_xlsx(self):
+        """Import a registrar-format .xlsx file and build the calendar from it."""
+        if self.is_scraping:
+            return
+
+        path = filedialog.askopenfilename(
+            title="Select registrar schedule (.xlsx)",
+            filetypes=[("Excel files", "*.xlsx"), ("All files", "*.*")])
+        if not path:
+            return
+
+        self.output_text.delete(1.0, tk.END)
+        try:
+            self.log("="*70)
+            self.log("📥 IMPORTING REGISTRAR SPREADSHEET")
+            self.log("="*70)
+            self.log(f"\nFile: {path}\n")
+
+            courses = registrar_io.read_registrar_xlsx(path)
+            if not courses:
+                self.log("⚠️  No course rows found in the file.")
+                messagebox.showwarning("Import", "No course rows were found in that file.")
+                return
+
+            self.courses = courses
+            timed = [c for c in courses if c.get('time')]
+            tba = len(courses) - len(timed)
+            self.log(f"✓ Read {len(courses)} courses "
+                     f"({len(timed)} scheduled, {tba} arranged/TBA)")
+
+            output_html = self.output_var.get()
+            output_json = output_html.replace('.html', '.json')
+            with open(output_json, 'w', encoding='utf-8') as f:
+                json.dump(courses, f, indent=2)
+            self.log(f"✓ Saved raw data to: {output_json}")
+
+            # Only scheduled courses can be placed on the calendar grid.
+            generate_html_calendar(timed, output_html)
+            self.log(f"✓ Calendar saved to: {output_html}")
+            if tba:
+                self.log(f"\nℹ️  {tba} arranged/TBA course(s) have no meeting time and "
+                         f"are not shown on the calendar grid (still kept in the data).")
+
+            self.update_status(f"Imported {len(courses)} courses")
+            self.progress_label.config(text=f"✅ Imported {len(courses)} courses")
+
+            if messagebox.askyesno("Import complete",
+                                   f"Imported {len(courses)} courses "
+                                   f"({len(timed)} scheduled).\n\n"
+                                   f"Calendar saved to: {output_html}\n\n"
+                                   "Open the calendar in your browser?"):
+                self.open_html_file(output_html)
+
+        except ImportError as e:
+            self.log(f"\n❌ {e}")
+            messagebox.showerror("Missing dependency", str(e))
+        except Exception as e:
+            self.log(f"\n❌ ERROR: {e}")
+            self.update_status("Import error")
+            messagebox.showerror("Import Error", f"Could not import that file:\n\n{e}")
+
+    def export_xlsx(self):
+        """Export the current courses to a registrar-format .xlsx file."""
+        courses = self.courses
+        # Fall back to the JSON next to the output file if nothing is loaded.
+        if not courses:
+            output_json = self.output_var.get().replace('.html', '.json')
+            if os.path.exists(output_json):
+                try:
+                    with open(output_json, encoding='utf-8') as f:
+                        courses = json.load(f)
+                except Exception:
+                    courses = None
+
+        if not courses:
+            messagebox.showinfo(
+                "Nothing to export",
+                "Scrape or import some courses first, then export.")
+            return
+
+        path = filedialog.asksaveasfilename(
+            title="Save registrar schedule (.xlsx)",
+            defaultextension=".xlsx",
+            initialfile="registrar_schedule.xlsx",
+            filetypes=[("Excel files", "*.xlsx")])
+        if not path:
+            return
+
+        try:
+            registrar_io.write_registrar_xlsx(courses, path)
+            self.log(f"\n✓ Exported {len(courses)} courses to: {path}")
+            self.update_status(f"Exported {len(courses)} courses")
+            messagebox.showinfo("Export complete",
+                                f"Exported {len(courses)} courses to:\n\n{path}")
+        except ImportError as e:
+            messagebox.showerror("Missing dependency", str(e))
+        except Exception as e:
+            self.log(f"\n❌ ERROR: {e}")
+            messagebox.showerror("Export Error", f"Could not write that file:\n\n{e}")
 
     def open_html_file(self, filename):
         """Open HTML file in default browser"""

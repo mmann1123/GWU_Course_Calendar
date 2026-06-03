@@ -24,7 +24,7 @@ def _registrar_xlsx_bytes():
     ws.title = 'Export'
     ws.append(registrar_io.REGISTRAR_COLUMNS)
     from datetime import datetime
-    ws.append([None, 'GEOG', '1001', 'Intro to Human Geography', None,
+    ws.append([None, 'GEOG', '1001', '10', 'Intro to Human Geography', None,
                'G10715190', 'Chacko', 'Elizabeth', 3, 120, 117, 40,
                datetime(2027, 1, 11), datetime(2027, 4, 26), 'TR', '1420', '1535', None])
     buf = io.BytesIO()

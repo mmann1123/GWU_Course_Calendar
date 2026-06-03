@@ -152,18 +152,19 @@ def _make_registrar_workbook(path, rows):
 
 # Column order matches rio.REGISTRAR_COLUMNS:
 # Changes, Subject Code, Course Number, Course, Section Title, GWID,
-# Last, First, Credits, Max, Prior, Wait, Start, End, Pattern, Begin, End, Comment
-_SCHEDULED = [None, 'GEOG', '1001', 'Intro to Human Geography', None,
+# Section, Course, Section Title, GWID, Last, First, Credits, Max, Prior, Wait,
+# Start, End, Pattern, Begin, End, Comment
+_SCHEDULED = [None, 'GEOG', '1001', '10', 'Intro to Human Geography', None,
               'G10715190', 'Chacko', 'Elizabeth', 3, 120, 117, 40,
               datetime(2027, 1, 11), datetime(2027, 4, 26), 'TR', '1420', '1535', None]
-_SPECIAL_TOPIC = [None, 'GEOG', '3195', 'Special Topics in Human Geog',
+_SPECIAL_TOPIC = [None, 'GEOG', '3195', '80', 'Special Topics in Human Geog',
                   'Global Environmental Justice', 'G22598702', 'Odell', 'Scott',
                   3, 20, 16, 40, datetime(2027, 1, 11), datetime(2027, 4, 26),
                   'R', '1710', '1900', 'Some comment.']
-_TBA = [None, 'GEOG', '6999', 'Thesis Research', None, 'G17436241', 'Rain', 'David',
+_TBA = [None, 'GEOG', '6999', '10', 'Thesis Research', None, 'G17436241', 'Rain', 'David',
         6, 10, 6, 0, datetime(2027, 1, 11), datetime(2027, 4, 26), None,
         '####', '####', 'Instructor Approval Required to Register.']
-_FULL = [None, 'GEOG', '2127', 'Population Geography', None, 'G24949761', 'Gardner',
+_FULL = [None, 'GEOG', '2127', '10', 'Population Geography', None, 'G24949761', 'Gardner',
          'Todd', 3, 24, 26, 40, datetime(2027, 1, 11), datetime(2027, 4, 26),
          'R', '1710', '1900', None]  # prior(26) > max(24) -> CLOSED
 
@@ -190,6 +191,7 @@ class TestReadRegistrar(unittest.TestCase):
         # registrar-only pass-through preserved
         self.assertEqual(c['gwid'], 'G10715190')
         self.assertEqual(c['max_enrollment'], 120)
+        self.assertEqual(c['section'], '10')
         self.assertEqual(c['source'], 'registrar')
 
     def test_special_topic_subtitle_folded(self):
@@ -245,7 +247,7 @@ class TestRoundTrip(unittest.TestCase):
         reread = rio.read_registrar_xlsx(self.dst)
 
         self.assertEqual(len(original), len(reread))
-        fields = ('subject', 'course_num', 'title', 'instructor', 'days', 'time',
+        fields = ('subject', 'course_num', 'section', 'title', 'instructor', 'days', 'time',
                   'credits', 'dates', 'status', 'gwid', 'comment', 'section_title',
                   'max_enrollment', 'prior_enrollment', 'wait_capacity')
         for a, b in zip(original, reread):
@@ -293,7 +295,7 @@ class TestHeaderVariants(unittest.TestCase):
 
     def test_messy_spacing_and_casing(self):
         # Extra spaces, lowercase, trailing space — all should still match.
-        headers = ['Changes', 'subject  code', 'Course  Number', 'Course', 'Section Title',
+        headers = ['Changes', 'subject  code', 'Course  Number', 'SECTION', 'Course', 'Section Title',
                    'Instructor GWID', 'instructor last name ', 'Instructor First name',
                    'Credits', 'Max Enrollment', 'Prior Enrollment', 'Wait Capacity',
                    'Course Start Date', 'Course End Date', 'Weekly Meeting Pattern',
@@ -303,6 +305,7 @@ class TestHeaderVariants(unittest.TestCase):
         self.assertEqual(len(courses), 1)
         self.assertEqual(courses[0]['instructor'], 'Chacko, E')
         self.assertEqual(courses[0]['subject'], 'GEOG')
+        self.assertEqual(courses[0]['section'], '10')
         self.assertEqual(warnings, [])
 
     def test_combined_instructor_column(self):
@@ -365,7 +368,7 @@ class TestBytesIO(unittest.TestCase):
 
 
 # A genuinely unassigned ("Staff") row: empty GWID/last/first.
-_STAFF_ROW = [None, 'GEOG', '1002', 'Intro-Physical Geography', None,
+_STAFF_ROW = [None, 'GEOG', '1002', '10', 'Intro-Physical Geography', None,
               None, None, None, 4, 100, 99, 0,
               datetime(2027, 1, 11), datetime(2027, 4, 26), 'MW', '1110', '1225', None]
 

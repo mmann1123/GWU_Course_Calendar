@@ -38,6 +38,7 @@ REGISTRAR_COLUMNS = [
     'Changes',
     'Subject Code',
     'Course Number',
+    'Section',
     'Course',
     'Section Title',
     'Instructor GWID',
@@ -207,6 +208,7 @@ def _normalize_header(value) -> str:
 _COLUMN_ALIASES = {
     'subject':            ['subject code', 'subject', 'subj', 'subject id'],
     'course_num':         ['course number', 'catalog number', 'course no', 'course num', 'catalog no', 'cat no'],
+    'section':            ['section', 'section number', 'section no', 'sect', 'sec'],
     'title':              ['course', 'course title', 'title', 'long title', 'course long title'],
     'section_title':      ['section title', 'topic', 'topic title'],
     'gwid':               ['instructor gwid', 'gwid', 'instructor id'],
@@ -322,6 +324,8 @@ def read_registrar_xlsx(source, return_warnings: bool = False):
         seq += 1
         subject = str(subject).strip() if subject is not None else ''
         course_num = str(course_num).strip() if course_num is not None else ''
+        section_num = cell(r, 'section')
+        section_num = str(section_num).strip() if section_num is not None else ''
         course_title = (str(cell(r, 'title')).strip()
                         if cell(r, 'title') is not None else '')
         section_title = (str(cell(r, 'section_title')).strip()
@@ -376,7 +380,7 @@ def read_registrar_xlsx(source, return_warnings: bool = False):
             'crn': f"R{seq:04d}",          # synthetic; registrar has no CRN column
             'subject': subject,
             'course_num': course_num,
-            'section': '',                 # registrar sheet has no section number
+            'section': section_num,        # blank if the sheet has no Section column
             'title': display_title,
             'credits': credits_to_display(cell(r, 'credits')),
             'instructor': instructor_display,
@@ -455,6 +459,7 @@ def _registrar_row(course: Dict) -> List:
         None,                                       # Changes
         subject,                                    # Subject Code
         course_num,                                 # Course Number
+        course.get('section') or None,              # Section
         title,                                      # Course
         section_title or None,                      # Section Title
         course.get('gwid') or None,                 # Instructor GWID
@@ -489,20 +494,28 @@ def write_registrar_xlsx(courses: List[Dict], target, sheet_name: str = 'Export'
         cell.font = Font(bold=True)
 
     date_style = 'mm/dd/yyyy'
+    date_cols = [REGISTRAR_COLUMNS.index('Course Start Date') + 1,
+                 REGISTRAR_COLUMNS.index('Course End Date') + 1]
     for course in courses:
         row = _registrar_row(course)
         ws.append(row)
-        # Format the two date cells (columns 13 and 14).
         r = ws.max_row
-        for col in (13, 14):
+        for col in date_cols:
             c = ws.cell(row=r, column=col)
             if isinstance(c.value, datetime):
                 c.number_format = date_style
 
-    # Reasonable column widths for readability.
-    widths = [9, 12, 13, 30, 22, 14, 18, 18, 8, 8, 8, 8, 16, 16, 10, 10, 10, 40]
-    for i, w in enumerate(widths, start=1):
-        ws.column_dimensions[openpyxl.utils.get_column_letter(i)].width = w
+    # Reasonable column widths for readability (keyed by header name).
+    widths = {
+        'Changes': 9, 'Subject Code': 12, 'Course Number': 13, 'Section': 9,
+        'Course': 30, 'Section Title': 22, 'Instructor GWID': 14,
+        'Instructor Last Name': 18, 'Instructor First Name': 18, 'Credits': 8,
+        'Max Enrollment': 8, 'Prior Enrollment': 8, 'Wait Capacity': 8,
+        'Course Start Date': 16, 'Course End Date': 16, 'Weekly Meeting Pattern': 10,
+        'Begin Time HHMM': 10, 'End Time HHMM': 10, 'Comment': 40,
+    }
+    for i, name in enumerate(REGISTRAR_COLUMNS, start=1):
+        ws.column_dimensions[openpyxl.utils.get_column_letter(i)].width = widths.get(name, 12)
 
     wb.save(target)
     return target

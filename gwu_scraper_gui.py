@@ -400,7 +400,7 @@ class ScraperGUI:
     def open_github_issues(self):
         """Open GitHub issues page in default browser"""
         import webbrowser
-        webbrowser.open('https://github.com/mmann1123/GWU_Course_Calendar/issues')
+        webbrowser.open('https://github.com/mmann1123/GWU_Course_Calendar/issues/new')
 
 
 def main():

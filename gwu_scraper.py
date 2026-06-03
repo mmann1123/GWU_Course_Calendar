@@ -516,6 +516,7 @@ def build_html_calendar(courses: List[Dict], year: str = None, semester: str = N
     <nav class="rtd-navbar">
         <div class="rtd-navbar-content">
             <div class="rtd-navbar-left">
+                <!--WEB_BACK_BUTTON-->
                 <span class="rtd-navbar-title">🎓 GWU Course Calendar</span>
             </div>
             <div class="rtd-navbar-right">
@@ -981,6 +982,44 @@ def build_html_calendar(courses: List[Dict], year: str = None, semester: str = N
             }});
         }}
 
+        // Lay out a day's courses into non-overlapping columns (Google Calendar style).
+        // Courses that overlap in time share horizontal width instead of stacking on top
+        // of one another. Uses connected time-clusters + greedy column packing so a course
+        // that overlaps a *later* neighbour (but not the first one) still shares space.
+        function layoutDayCourses(coursesForDay) {{
+            const sorted = [...coursesForDay].sort((a, b) =>
+                timeToMinutes(a.time.start) - timeToMinutes(b.time.start));
+            const result = [];
+            let cluster = [];
+            let clusterMaxEnd = -1;
+            const flush = () => {{
+                if (!cluster.length) return;
+                const colEnds = [];   // last end-time (minutes) placed in each column
+                const cols = [];      // chosen column index per course in the cluster
+                cluster.forEach(c => {{
+                    const s = timeToMinutes(c.time.start);
+                    const e = timeToMinutes(c.time.end);
+                    let col = colEnds.findIndex(end => s >= end);
+                    if (col === -1) {{ col = colEnds.length; colEnds.push(e); }}
+                    else {{ colEnds[col] = e; }}
+                    cols.push(col);
+                }});
+                const numCols = colEnds.length;
+                cluster.forEach((c, i) => result.push({{course: c, column: cols[i], numCols}}));
+                cluster = [];
+                clusterMaxEnd = -1;
+            }};
+            sorted.forEach(c => {{
+                const s = timeToMinutes(c.time.start);
+                const e = timeToMinutes(c.time.end);
+                if (cluster.length && s >= clusterMaxEnd) flush();  // gap -> new cluster
+                cluster.push(c);
+                clusterMaxEnd = Math.max(clusterMaxEnd, e);
+            }});
+            flush();
+            return result;
+        }}
+
         function renderCourses() {{
             const startHour = 9;
             const pixelsPerMinute = 1;
@@ -997,38 +1036,12 @@ def build_html_calendar(courses: List[Dict], year: str = None, semester: str = N
             Object.keys(coursesByDay).forEach(dayId => {{
                 const dayColumn = document.getElementById(dayId);
                 const coursesForDay = coursesByDay[dayId];
-                coursesForDay.sort((a, b) => timeToMinutes(a.time.start) - timeToMinutes(b.time.start));
-                const processed = new Set();
-                coursesForDay.forEach((course, index) => {{
-                    if (processed.has(index)) return;
+                layoutDayCourses(coursesForDay).forEach(({{course, column, numCols}}) => {{
                     const startMinutes = timeToMinutes(course.time.start);
                     const endMinutes = timeToMinutes(course.time.end);
-                    const duration = endMinutes - startMinutes;
                     const topPosition = (startMinutes - (startHour * 60)) * pixelsPerMinute;
-                    const height = duration * pixelsPerMinute;
-                    const overlapping = [];
-                    for (let i = index + 1; i < coursesForDay.length; i++) {{
-                        if (processed.has(i)) continue;
-                        const other = coursesForDay[i];
-                        const otherStart = timeToMinutes(other.time.start);
-                        const otherEnd = timeToMinutes(other.time.end);
-                        if (startMinutes < otherEnd && endMinutes > otherStart) {{
-                            overlapping.push({{course: other, index: i}});
-                        }}
-                    }}
-                    const totalOverlapping = overlapping.length + 1;
-                    const widthPercent = 100 / totalOverlapping;
-                    renderCourseBlock(course, dayColumn, topPosition, height, 0, widthPercent);
-                    processed.add(index);
-                    overlapping.forEach((item, i) => {{
-                        const otherStartMinutes = timeToMinutes(item.course.time.start);
-                        const otherEndMinutes = timeToMinutes(item.course.time.end);
-                        const otherDuration = otherEndMinutes - otherStartMinutes;
-                        const otherTopPosition = (otherStartMinutes - (startHour * 60)) * pixelsPerMinute;
-                        const otherHeight = otherDuration * pixelsPerMinute;
-                        renderCourseBlock(item.course, dayColumn, otherTopPosition, otherHeight, i + 1, widthPercent);
-                        processed.add(item.index);
-                    }});
+                    const height = (endMinutes - startMinutes) * pixelsPerMinute;
+                    renderCourseBlock(course, dayColumn, topPosition, height, column, 100 / numCols);
                 }});
             }});
         }}
@@ -1251,42 +1264,12 @@ def build_html_calendar(courses: List[Dict], year: str = None, semester: str = N
             Object.keys(coursesByDay).forEach(dayId => {{
                 const dayColumn = document.getElementById(dayId);
                 const coursesForDay = coursesByDay[dayId];
-                coursesForDay.sort((a, b) => timeToMinutes(a.time.start) - timeToMinutes(b.time.start));
-                const processed = new Set();
-
-                coursesForDay.forEach((course, index) => {{
-                    if (processed.has(index)) return;
+                layoutDayCourses(coursesForDay).forEach(({{course, column, numCols}}) => {{
                     const startMinutes = timeToMinutes(course.time.start);
                     const endMinutes = timeToMinutes(course.time.end);
-                    const duration = endMinutes - startMinutes;
                     const topPosition = (startMinutes - (startHour * 60)) * pixelsPerMinute;
-                    const height = duration * pixelsPerMinute;
-                    const overlapping = [];
-
-                    for (let i = index + 1; i < coursesForDay.length; i++) {{
-                        if (processed.has(i)) continue;
-                        const other = coursesForDay[i];
-                        const otherStart = timeToMinutes(other.time.start);
-                        const otherEnd = timeToMinutes(other.time.end);
-                        if (startMinutes < otherEnd && endMinutes > otherStart) {{
-                            overlapping.push({{course: other, index: i}});
-                        }}
-                    }}
-
-                    const totalOverlapping = overlapping.length + 1;
-                    const widthPercent = 100 / totalOverlapping;
-                    renderCourseBlock(course, dayColumn, topPosition, height, 0, widthPercent);
-                    processed.add(index);
-
-                    overlapping.forEach((item, i) => {{
-                        const otherStartMinutes = timeToMinutes(item.course.time.start);
-                        const otherEndMinutes = timeToMinutes(item.course.time.end);
-                        const otherDuration = otherEndMinutes - otherStartMinutes;
-                        const otherTopPosition = (otherStartMinutes - (startHour * 60)) * pixelsPerMinute;
-                        const otherHeight = otherDuration * pixelsPerMinute;
-                        renderCourseBlock(item.course, dayColumn, otherTopPosition, otherHeight, i + 1, widthPercent);
-                        processed.add(item.index);
-                    }});
+                    const height = (endMinutes - startMinutes) * pixelsPerMinute;
+                    renderCourseBlock(course, dayColumn, topPosition, height, column, 100 / numCols);
                 }});
             }});
         }}
@@ -2050,79 +2033,12 @@ def build_html_calendar(courses: List[Dict], year: str = None, semester: str = N
                 const dayColumn = document.getElementById(`edit-${{dayName}}`);
                 const coursesForDay = coursesByDay[dayName];
 
-                // Debug: Log all courses for Tuesday to see what's being grouped
-                if (dayName === 'tuesday') {{
-                    console.log('=== DEBUG TUESDAY COURSES (BEFORE SORT) ===');
-                    console.log('Total courses on Tuesday:', coursesForDay.length);
-                    coursesForDay.forEach((c, idx) => {{
-                        const mins = timeToMinutes(c.time.start);
-                        console.log(`[${{idx}}] CRN ${{c.crn}}: ${{c.time.start}} - ${{c.time.end}} (start=${{mins}} mins) | ${{c.course_number}} ${{c.title}}`);
-                    }});
-                }}
-
-                // Sort by start time
-                coursesForDay.sort((a, b) => timeToMinutes(a.time.start) - timeToMinutes(b.time.start));
-
-                // Debug: Log after sorting
-                if (dayName === 'tuesday') {{
-                    console.log('=== DEBUG TUESDAY COURSES (AFTER SORT) ===');
-                    coursesForDay.forEach((c, idx) => {{
-                        const mins = timeToMinutes(c.time.start);
-                        console.log(`[${{idx}}] CRN ${{c.crn}}: ${{c.time.start}} - ${{c.time.end}} (start=${{mins}} mins) | ${{c.course_number}} ${{c.title}}`);
-                    }});
-                }}
-
-                const processed = new Set();
-
-                coursesForDay.forEach((course, index) => {{
-                    if (processed.has(index)) return;
-
+                layoutDayCourses(coursesForDay).forEach(({{course, column, numCols}}) => {{
                     const startMinutes = timeToMinutes(course.time.start);
                     const endMinutes = timeToMinutes(course.time.end);
-                    const duration = endMinutes - startMinutes;
                     const topPosition = (startMinutes - (startHour * 60)) * pixelsPerMinute;
-                    const height = duration * pixelsPerMinute;
-
-                    // Debug log for ALL courses on Tuesday to see positioning
-                    if (dayName === 'tuesday') {{
-                        console.log(`=== RENDER CRN ${{course.crn}} ===`);
-                        console.log('  time.start:', course.time.start, '→', startMinutes, 'minutes');
-                        console.log('  time.end:', course.time.end, '→', endMinutes, 'minutes');
-                        console.log('  duration:', duration, 'minutes');
-                        console.log('  topPosition:', topPosition, 'px');
-                        console.log('  height:', height, 'px');
-                    }}
-
-                    // Find overlapping courses
-                    const overlapping = [];
-                    for (let i = index + 1; i < coursesForDay.length; i++) {{
-                        if (processed.has(i)) continue;
-                        const other = coursesForDay[i];
-                        const otherStart = timeToMinutes(other.time.start);
-                        const otherEnd = timeToMinutes(other.time.end);
-                        if (startMinutes < otherEnd && endMinutes > otherStart) {{
-                            overlapping.push({{course: other, index: i}});
-                        }}
-                    }}
-
-                    // Calculate widths and positions
-                    const totalOverlapping = overlapping.length + 1;
-                    const widthPercent = 100 / totalOverlapping;
-
-                    // Render main course
-                    renderEditCourseBlock(course, dayColumn, topPosition, height, 0, widthPercent);
-                    processed.add(index);
-
-                    // Render overlapping courses
-                    overlapping.forEach((item, i) => {{
-                        const otherStartMinutes = timeToMinutes(item.course.time.start);
-                        const otherEndMinutes = timeToMinutes(item.course.time.end);
-                        const otherDuration = otherEndMinutes - otherStartMinutes;
-                        const otherTopPosition = (otherStartMinutes - (startHour * 60)) * pixelsPerMinute;
-                        const otherHeight = otherDuration * pixelsPerMinute;
-                        renderEditCourseBlock(item.course, dayColumn, otherTopPosition, otherHeight, i + 1, widthPercent);
-                        processed.add(item.index);
-                    }});
+                    const height = (endMinutes - startMinutes) * pixelsPerMinute;
+                    renderEditCourseBlock(course, dayColumn, topPosition, height, column, 100 / numCols);
                 }});
             }});
         }}
@@ -2131,11 +2047,6 @@ def build_html_calendar(courses: List[Dict], year: str = None, semester: str = N
         function renderEditCourseBlock(course, dayColumn, topPosition, height, column, widthPercent) {{
             const block = document.createElement('div');
             block.className = 'course-block';
-
-            // Debug Tuesday renders
-            if (dayColumn.id === 'edit-tuesday' && course.time.start === '11:00AM') {{
-                console.log(`  → renderEditCourseBlock CRN ${{course.crn}}: top=${{topPosition}}px, left=${{(column * widthPercent).toFixed(1)}}%, width=${{widthPercent.toFixed(1)}}%, column=${{column}}`);
-            }}
 
             // Mark edited courses
             if (editedCRNs.has(course.crn)) {{
@@ -2958,6 +2869,11 @@ def build_html_calendar(courses: List[Dict], year: str = None, semester: str = N
     # Done AFTER the base64 embed above, so the offline export blob never carries
     # a server dependency. When web_export is False, the placeholders are stripped.
     if web_export:
+        back_button_html = (
+            '<a href="/" class="rtd-nav-link" title="Start over"'
+            ' style="margin-right:18px; border:1px solid rgba(255,255,255,0.45);'
+            ' padding:4px 12px; border-radius:6px;">&larr; New calendar</a>'
+        )
         button_html = (
             '<button class="edit-action-btn btn-primary" '
             'onclick="exportToRegistrarServer()">📥 Export to Registrar (.xlsx)</button>'
@@ -2979,8 +2895,10 @@ def build_html_calendar(courses: List[Dict], year: str = None, semester: str = N
         }
 '''
     else:
+        back_button_html = ''
         button_html = ''
         script_js = ''
+    html_template = html_template.replace('<!--WEB_BACK_BUTTON-->', back_button_html)
     html_template = html_template.replace('<!--WEB_EXPORT_BUTTON-->', button_html)
     html_template = html_template.replace('//WEB_EXPORT_SCRIPT', script_js)
 

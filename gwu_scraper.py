@@ -287,8 +287,17 @@ class CourseScraper:
         print(f"✓ Saved raw data to: {filename}")
 
 
-def generate_html_calendar(courses: List[Dict], output_file: str, year: str = None, semester: str = None):
-    """Generate interactive HTML calendar"""
+def build_html_calendar(courses: List[Dict], year: str = None, semester: str = None,
+                        web_export: bool = False) -> str:
+    """Build the interactive HTML calendar and return it as a string.
+
+    When ``web_export`` is True, a "📥 Export to Registrar (.xlsx)" button is added
+    to the edit toolbar that POSTs the live edited courses to the server's
+    ``/export/xlsx`` endpoint. This injection happens *after* the self-contained
+    ``EXPORT_TEMPLATE_B64`` blob is built, so the browser's offline "Export
+    Schedule" stays server-independent. With ``web_export`` False the placeholders
+    are stripped, producing output identical to the standalone/CLI calendar.
+    """
 
     courses_json = json.dumps(courses, ensure_ascii=False)
 
@@ -703,6 +712,7 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
                 <button class="edit-action-btn btn-primary" onclick="exportSchedule()">
                     📦 Export Schedule
                 </button>
+                <!--WEB_EXPORT_BUTTON-->
             </div>
 
             <!-- Edit Mode Conflicts Section -->
@@ -2881,6 +2891,8 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
             }}, 3000);
         }}
 
+        //WEB_EXPORT_SCRIPT
+
         // ============================================================================
         // END EDIT MODE FUNCTIONS
         // ============================================================================
@@ -2918,8 +2930,11 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
             </div>
         </div>
         <div class="rtd-footer-attribution">
-            Credit: Michael Mann, Dept of Geography & Environment<br>
-            Scraped on {datetime.now().strftime("%B %d, %Y at %I:%M %p")} | Built with Python & BeautifulSoup
+            Created by <a href="https://github.com/mmann1123" target="_blank" rel="noopener" style="color:#8ab4f8;">Michael Mann</a> ·
+            <a href="https://geography.columbian.gwu.edu/" target="_blank" rel="noopener" style="color:#8ab4f8;">Department of Geography &amp; Environment</a>,
+            The George Washington University ·
+            Part of <a href="https://pygis.io" target="_blank" rel="noopener" style="color:#8ab4f8;">pygis.io</a><br>
+            Generated {datetime.now().strftime("%B %d, %Y at %I:%M %p")} | Built with Python &amp; BeautifulSoup
         </div>
     </footer>
 </body>
@@ -2939,10 +2954,72 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
         template_constant + 'const courses = '
     )
 
-    with open(output_file, 'w', encoding='utf-8') as f:
-        f.write(html_template)
+    # Optionally inject the server-side "Export to Registrar (.xlsx)" button + JS.
+    # Done AFTER the base64 embed above, so the offline export blob never carries
+    # a server dependency. When web_export is False, the placeholders are stripped.
+    if web_export:
+        button_html = (
+            '<button class="edit-action-btn btn-primary" '
+            'onclick="exportToRegistrarServer()">📥 Export to Registrar (.xlsx)</button>'
+        )
+        script_js = '''
+        // Export the live edited schedule to the server, which returns a
+        // registrar-format .xlsx (stateless: built in memory, streamed back).
+        function exportToRegistrarServer() {
+            fetch('/export/xlsx', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(editedCourses)
+            })
+            .then(r => { if (!r.ok) throw new Error('Export failed (' + r.status + ')'); return r.blob(); })
+            .then(blob => downloadFile(blob, 'registrar_export.xlsx',
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'))
+            .then(() => showToast('📥 Registrar .xlsx downloaded', 'success'))
+            .catch(err => showToast('❌ ' + err.message, 'error'));
+        }
+'''
+    else:
+        button_html = ''
+        script_js = ''
+    html_template = html_template.replace('<!--WEB_EXPORT_BUTTON-->', button_html)
+    html_template = html_template.replace('//WEB_EXPORT_SCRIPT', script_js)
 
+    return html_template
+
+
+def generate_html_calendar(courses: List[Dict], output_file: str, year: str = None, semester: str = None):
+    """Generate the interactive HTML calendar and write it to ``output_file``."""
+    html = build_html_calendar(courses, year=year, semester=semester, web_export=False)
+    with open(output_file, 'w', encoding='utf-8') as f:
+        f.write(html)
     print(f"✓ Calendar saved to: {output_file}")
+
+
+# GWU semester code -> month digits used in termId (YYYYMM).
+GWU_SEMESTER_CODES = {'01', '02', '03'}
+
+
+def build_gwu_url(year, semester, subject) -> str:
+    """Construct (and validate) the GWU course-schedule URL.
+
+    This is the ONLY place the target host is set, so callers never pass a raw
+    URL — eliminating SSRF when invoked from the web layer. Raises ValueError on
+    invalid input. ``semester`` is the termId month code: 01=Spring, 02=Summer,
+    03=Fall.
+    """
+    year = str(year).strip()
+    semester = str(semester).strip()
+    subject = str(subject).strip().upper()
+
+    if not (year.isdigit() and len(year) == 4 and 2000 <= int(year) <= 2099):
+        raise ValueError(f"Invalid year: {year!r} (expected 4-digit year 2000-2099)")
+    if semester not in GWU_SEMESTER_CODES:
+        raise ValueError(f"Invalid semester code: {semester!r} (expected 01, 02, or 03)")
+    if not re.fullmatch(r'[A-Z]{2,5}', subject):
+        raise ValueError(f"Invalid subject code: {subject!r} (expected 2-5 letters)")
+
+    return (f"https://my.gwu.edu/mod/pws/courses.cfm"
+            f"?campId=1&termId={year}{semester}&subjId={subject}")
 
 
 def main():
@@ -2973,7 +3050,9 @@ def main():
         if args.xlsx_in:
             import registrar_io
             print(f"Reading registrar file: {args.xlsx_in}\n")
-            courses = registrar_io.read_registrar_xlsx(args.xlsx_in)
+            courses, warnings = registrar_io.read_registrar_xlsx(args.xlsx_in, return_warnings=True)
+            for w in warnings:
+                print(f"⚠️  {w}")
             timed = sum(1 for c in courses if c.get('time'))
             print(f"✓ Read {len(courses)} courses "
                   f"({timed} scheduled, {len(courses) - timed} arranged/TBA)")

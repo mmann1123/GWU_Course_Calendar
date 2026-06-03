@@ -188,8 +188,64 @@ def derive_status(max_enrollment, prior_enrollment) -> str:
 # Reader: registrar .xlsx -> course dictionaries
 # ---------------------------------------------------------------------------
 
-def read_registrar_xlsx(path: str) -> List[Dict]:
+def _normalize_header(value) -> str:
+    """Normalize a header cell for tolerant matching.
+
+    Lowercases, strips, collapses internal whitespace, and turns non-breaking
+    spaces into regular ones — so 'Instructor  Last Name ', 'Instructor Last name',
+    and 'instructor last name' all compare equal.
+    """
+    if value is None:
+        return ''
+    return ' '.join(str(value).replace('\xa0', ' ').lower().split())
+
+
+# Logical field -> ordered list of accepted (normalized) header names. Different
+# GWU/registrar export variants spell these columns differently; the reader maps
+# whatever it finds onto these logical keys. Alias lists are kept disjoint so a
+# physical column never maps to two logical fields. First match wins.
+_COLUMN_ALIASES = {
+    'subject':            ['subject code', 'subject', 'subj', 'subject id'],
+    'course_num':         ['course number', 'catalog number', 'course no', 'course num', 'catalog no', 'cat no'],
+    'title':              ['course', 'course title', 'title', 'long title', 'course long title'],
+    'section_title':      ['section title', 'topic', 'topic title'],
+    'gwid':               ['instructor gwid', 'gwid', 'instructor id'],
+    'instructor_last':    ['instructor last name', 'last name', 'instructor last', 'primary instructor last name'],
+    'instructor_first':   ['instructor first name', 'first name', 'instructor first', 'primary instructor first name'],
+    'instructor_combined': ['instructor', 'instructor name', 'primary instructor', 'instructor(s)', 'faculty', 'instructor names'],
+    'credits':            ['credits', 'credit', 'credit hours', 'units', 'hours'],
+    'max_enrollment':     ['max enrollment', 'maximum enrollment', 'enrollment capacity', 'capacity', 'max enroll', 'enrollment cap'],
+    'prior_enrollment':   ['prior enrollment', 'current enrollment', 'actual enrollment', 'enrolled', 'enrollment', 'enrl'],
+    'wait_capacity':      ['wait capacity', 'waitlist capacity', 'wait list capacity', 'waitlist cap'],
+    'start_date':         ['course start date', 'start date', 'begin date'],
+    'end_date':           ['course end date', 'end date'],
+    'days':               ['weekly meeting pattern', 'meeting pattern', 'days', 'meeting days', 'pattern'],
+    'begin_time':         ['begin time hhmm', 'begin time', 'start time hhmm', 'start time', 'begin'],
+    'end_time':           ['end time hhmm', 'end time', 'end'],
+    'comment':            ['comment', 'comments', 'notes', 'note'],
+}
+
+# Fields whose absence is worth warning about (they hold the data users care about).
+_CRITICAL_FIELDS = [
+    ('subject', 'Subject Code'),
+    ('course_num', 'Course Number'),
+    ('title', 'Course'),
+    ('days', 'Weekly Meeting Pattern'),
+    ('begin_time', 'Begin Time HHMM'),
+    ('end_time', 'End Time HHMM'),
+]
+
+
+def read_registrar_xlsx(source, return_warnings: bool = False):
     """Read a registrar .xlsx file and return a list of course dictionaries.
+
+    ``source`` may be a filesystem path **or** a file-like object (e.g. BytesIO),
+    so callers can read an uploaded file without touching disk.
+
+    Columns are matched by *normalized* header name against ``_COLUMN_ALIASES``,
+    so the reader tolerates spelling/spacing/casing differences between registrar
+    export variants (and a single combined ``Instructor`` column). If a critical
+    column can't be found, a human-readable warning is produced.
 
     Every data row is returned, including arranged / TBA courses (which have
     ``time`` set to None and empty ``days``). Use ``[c for c in courses if
@@ -199,37 +255,65 @@ def read_registrar_xlsx(path: str) -> List[Dict]:
     ``gwid``, ``instructor_last``, ``instructor_first``, ``section_title``,
     ``max_enrollment``, ``prior_enrollment``, ``wait_capacity``, ``comment``,
     ``course_start_date``/``course_end_date`` (ISO), and ``source='registrar'``.
+
+    Returns ``courses`` by default, or ``(courses, warnings)`` when
+    ``return_warnings=True`` (``warnings`` is a list of strings).
     """
     _require_openpyxl()
-    wb = openpyxl.load_workbook(path, data_only=True)
+    wb = openpyxl.load_workbook(source, data_only=True)
     ws = wb.active  # registrar files use a single 'Export' sheet
 
-    # Locate the header row (the one containing 'Subject Code') and map names.
+    subject_aliases = _COLUMN_ALIASES['subject']
+
+    # Locate the header row (the one with a recognizable 'subject' column) and
+    # build a {normalized header name -> column index} map.
     header_row = None
-    col_index = {}
+    norm_to_col = {}
     for r in range(1, min(ws.max_row, 10) + 1):
-        values = [ws.cell(row=r, column=c).value for c in range(1, ws.max_column + 1)]
-        names = [str(v).strip() if v is not None else '' for v in values]
-        if 'Subject Code' in names:
+        row_norm = {}
+        for c in range(1, ws.max_column + 1):
+            name = _normalize_header(ws.cell(row=r, column=c).value)
+            if name and name not in row_norm:
+                row_norm[name] = c
+        if any(alias in row_norm for alias in subject_aliases):
             header_row = r
-            col_index = {name: i + 1 for i, name in enumerate(names) if name}
+            norm_to_col = row_norm
             break
 
     if header_row is None:
         raise ValueError(
-            "Could not find a registrar header row (expected a 'Subject Code' "
-            "column). Is this the registrar's Export .xlsx layout?"
+            "Could not find a registrar header row (expected a subject column "
+            "such as 'Subject Code'). Is this the registrar's Export .xlsx layout?"
         )
 
-    def cell(r, name):
-        c = col_index.get(name)
+    # Resolve each logical field to a column index (first matching alias wins).
+    field_col = {}
+    for key, aliases in _COLUMN_ALIASES.items():
+        for alias in aliases:
+            if alias in norm_to_col:
+                field_col[key] = norm_to_col[alias]
+                break
+
+    # Warn about missing critical columns so a bad/variant file isn't silent.
+    warnings: List[str] = []
+    if not any(k in field_col for k in ('instructor_last', 'instructor_first', 'instructor_combined')):
+        warnings.append(
+            "No instructor column found (looked for 'Instructor Last Name'/'First "
+            "Name' or a single 'Instructor' column) — instructors will show as 'Staff'."
+        )
+    for key, label in _CRITICAL_FIELDS:
+        if key not in field_col:
+            warnings.append(f"Column not found for '{label}' — that field will be blank.")
+
+    def cell(r, key):
+        c = field_col.get(key)
         return ws.cell(row=r, column=c).value if c else None
 
     courses: List[Dict] = []
     seq = 0
     for r in range(header_row + 1, ws.max_row + 1):
-        subject = cell(r, 'Subject Code')
-        course_num = cell(r, 'Course Number')
+        subject = cell(r, 'subject')
+        course_num = cell(r, 'course_num')
         # Skip fully blank rows.
         if (subject is None or str(subject).strip() == '') and \
            (course_num is None or str(course_num).strip() == ''):
@@ -238,28 +322,39 @@ def read_registrar_xlsx(path: str) -> List[Dict]:
         seq += 1
         subject = str(subject).strip() if subject is not None else ''
         course_num = str(course_num).strip() if course_num is not None else ''
-        course_title = (str(cell(r, 'Course')).strip()
-                        if cell(r, 'Course') is not None else '')
-        section_title = (str(cell(r, 'Section Title')).strip()
-                         if cell(r, 'Section Title') is not None else '')
+        course_title = (str(cell(r, 'title')).strip()
+                        if cell(r, 'title') is not None else '')
+        section_title = (str(cell(r, 'section_title')).strip()
+                         if cell(r, 'section_title') is not None else '')
 
-        last = cell(r, 'Instructor Last Name')
-        first = cell(r, 'Instructor First Name')
-        gwid = cell(r, 'Instructor GWID')
+        # Instructor: prefer split last/first columns; fall back to a single
+        # combined 'Instructor' column parsed as "Last, First".
+        last_raw = cell(r, 'instructor_last')
+        first_raw = cell(r, 'instructor_first')
+        last = str(last_raw).strip() if last_raw is not None else ''
+        first = str(first_raw).strip() if first_raw is not None else ''
+        if not last and not first:
+            combined = cell(r, 'instructor_combined')
+            if combined is not None and str(combined).strip():
+                last, first = split_instructor_display(str(combined).strip())
+        # Genuinely unassigned sections show as 'Staff' (but stay blank on export
+        # because instructor_last/first are kept empty below).
+        instructor_display = build_instructor_display(last, first) or 'Staff'
 
-        max_e = cell(r, 'Max Enrollment')
-        prior_e = cell(r, 'Prior Enrollment')
-        wait_c = cell(r, 'Wait Capacity')
+        gwid = cell(r, 'gwid')
+        max_e = cell(r, 'max_enrollment')
+        prior_e = cell(r, 'prior_enrollment')
+        wait_c = cell(r, 'wait_capacity')
 
-        start_dt = _to_datetime(cell(r, 'Course Start Date'))
-        end_dt = _to_datetime(cell(r, 'Course End Date'))
+        start_dt = _to_datetime(cell(r, 'start_date'))
+        end_dt = _to_datetime(cell(r, 'end_date'))
 
-        days = cell(r, 'Weekly Meeting Pattern')
+        days = cell(r, 'days')
         days = ''.join(ch for ch in str(days).strip() if ch in 'MTWRF') if days else ''
 
-        start12 = hhmm_to_12h(cell(r, 'Begin Time HHMM'))
-        end12 = hhmm_to_12h(cell(r, 'End Time HHMM'))
-        comment = cell(r, 'Comment')
+        start12 = hhmm_to_12h(cell(r, 'begin_time'))
+        end12 = hhmm_to_12h(cell(r, 'end_time'))
+        comment = cell(r, 'comment')
 
         # Display title folds in the special-topics section title when present.
         display_title = course_title
@@ -283,8 +378,8 @@ def read_registrar_xlsx(path: str) -> List[Dict]:
             'course_num': course_num,
             'section': '',                 # registrar sheet has no section number
             'title': display_title,
-            'credits': credits_to_display(cell(r, 'Credits')),
-            'instructor': build_instructor_display(last, first),
+            'credits': credits_to_display(cell(r, 'credits')),
+            'instructor': instructor_display,
             'days': days,
             'time': time_info,
             'dates': dates_str,
@@ -295,8 +390,8 @@ def read_registrar_xlsx(path: str) -> List[Dict]:
             'source': 'registrar',
             'synthetic_crn': True,
             'gwid': str(gwid).strip() if gwid is not None else '',
-            'instructor_last': str(last).strip() if last is not None else '',
-            'instructor_first': str(first).strip() if first is not None else '',
+            'instructor_last': last,
+            'instructor_first': first,
             'section_title': section_title,
             'max_enrollment': max_e,
             'prior_enrollment': prior_e,
@@ -307,6 +402,8 @@ def read_registrar_xlsx(path: str) -> List[Dict]:
         }
         courses.append(course)
 
+    if return_warnings:
+        return courses, warnings
     return courses
 
 
@@ -326,9 +423,14 @@ def _registrar_row(course: Dict) -> List:
         # whole thing in Course and Section Title blank; nothing to recover.
         pass
 
-    last = course.get('instructor_last', '')
-    first = course.get('instructor_first', '')
-    if not last and not first:
+    # Registrar-sourced courses carry authoritative last/first (possibly empty
+    # for unassigned 'Staff' sections — keep them empty so we never write 'Staff'
+    # back as a real name). Only website-scraped courses lack these keys, so for
+    # those we recover last + initial from the 'instructor' display string.
+    if 'instructor_last' in course or 'instructor_first' in course:
+        last = course.get('instructor_last', '') or ''
+        first = course.get('instructor_first', '') or ''
+    else:
         last, first = split_instructor_display(course.get('instructor', ''))
 
     # Course title: drop any "- Section Title" suffix when we have it separately.
@@ -371,8 +473,12 @@ def _registrar_row(course: Dict) -> List:
     ]
 
 
-def write_registrar_xlsx(courses: List[Dict], path: str, sheet_name: str = 'Export'):
-    """Write a list of course dictionaries to a registrar-format .xlsx file."""
+def write_registrar_xlsx(courses: List[Dict], target, sheet_name: str = 'Export'):
+    """Write a list of course dictionaries to a registrar-format .xlsx file.
+
+    ``target`` may be a filesystem path **or** a file-like object (e.g. BytesIO),
+    so the workbook can be streamed back to a web client without touching disk.
+    """
     _require_openpyxl()
     wb = openpyxl.Workbook()
     ws = wb.active
@@ -398,5 +504,5 @@ def write_registrar_xlsx(courses: List[Dict], path: str, sheet_name: str = 'Expo
     for i, w in enumerate(widths, start=1):
         ws.column_dimensions[openpyxl.utils.get_column_letter(i)].width = w
 
-    wb.save(path)
-    return path
+    wb.save(target)
+    return target

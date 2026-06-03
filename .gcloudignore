@@ -1,0 +1,29 @@
+# Same exclusions as .dockerignore so `gcloud run deploy --source .` doesn't
+# upload the 130+ MB of dev media / venv. (.gcloudignore overrides .gitignore
+# for what gets uploaded to Cloud Build.)
+.venv/
+.git/
+.github/
+.vscode/
+.claude/
+__pycache__/
+*.pyc
+tests/
+
+# Desktop-distribution artifacts
+gwu_scraper_gui.py
+*.bat
+*.sh
+
+# Large media / docs
+static/
+docs/
+*.gif
+*.png
+
+# Generated build outputs / sample data
+gwu_course_calendar.html
+gwu_course_calendar.json
+gwu_course_calendar_template.html
+courses_data.json
+*.xlsx

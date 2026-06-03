@@ -307,7 +307,9 @@ class ScraperGUI:
             self.log("="*70)
             self.log(f"\nFile: {path}\n")
 
-            courses = registrar_io.read_registrar_xlsx(path)
+            courses, warnings = registrar_io.read_registrar_xlsx(path, return_warnings=True)
+            for w in warnings:
+                self.log(f"⚠️  {w}")
             if not courses:
                 self.log("⚠️  No course rows found in the file.")
                 messagebox.showwarning("Import", "No course rows were found in that file.")

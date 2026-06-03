@@ -1,0 +1,28 @@
+# Keep the image small and cold starts fast — only the web app modules are copied
+# explicitly in the Dockerfile; this excludes everything heavy/irrelevant.
+.venv/
+.git/
+.github/
+.vscode/
+.claude/
+__pycache__/
+*.pyc
+tests/
+
+# Desktop-distribution artifacts (not used by the web app)
+gwu_scraper_gui.py
+*.bat
+*.sh
+
+# Large media / docs (76 MB static, 36 MB docs gif)
+static/
+docs/
+*.gif
+*.png
+
+# Generated build outputs / sample data
+gwu_course_calendar.html
+gwu_course_calendar.json
+gwu_course_calendar_template.html
+courses_data.json
+*.xlsx

@@ -3,6 +3,11 @@ __pycache__/
 *.html
 *.json
 
+# Dev environment / editor
+.venv/
+.vscode/
+.claude/
+
 # Allow docs folder for GitHub Pages
 !docs/
 !docs/**

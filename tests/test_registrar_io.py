@@ -272,5 +272,103 @@ class TestRoundTrip(unittest.TestCase):
         self.assertEqual(c['credits'], '3.00')
 
 
+def _make_workbook_with_headers(path, headers, rows):
+    """Write a workbook with arbitrary header names (for variant-matching tests)."""
+    import openpyxl
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = 'Export'
+    ws.append(headers)
+    for row in rows:
+        ws.append(row)
+    wb.save(path)
+
+
+class TestHeaderVariants(unittest.TestCase):
+    """The reader must tolerate spelling/spacing/casing and combined columns."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self.path = os.path.join(self.tmp, 'variant.xlsx')
+
+    def test_messy_spacing_and_casing(self):
+        # Extra spaces, lowercase, trailing space — all should still match.
+        headers = ['Changes', 'subject  code', 'Course  Number', 'Course', 'Section Title',
+                   'Instructor GWID', 'instructor last name ', 'Instructor First name',
+                   'Credits', 'Max Enrollment', 'Prior Enrollment', 'Wait Capacity',
+                   'Course Start Date', 'Course End Date', 'Weekly Meeting Pattern',
+                   'Begin Time HHMM', 'End Time HHMM', 'Comment']
+        _make_workbook_with_headers(self.path, headers, [_SCHEDULED])
+        courses, warnings = rio.read_registrar_xlsx(self.path, return_warnings=True)
+        self.assertEqual(len(courses), 1)
+        self.assertEqual(courses[0]['instructor'], 'Chacko, E')
+        self.assertEqual(courses[0]['subject'], 'GEOG')
+        self.assertEqual(warnings, [])
+
+    def test_combined_instructor_column(self):
+        # A single "Instructor" column holding "Last, First".
+        headers = ['Subject Code', 'Course Number', 'Course', 'Instructor',
+                   'Credits', 'Weekly Meeting Pattern', 'Begin Time HHMM', 'End Time HHMM']
+        row = ['GEOG', '1001', 'Intro to Human Geography', 'Chacko, Elizabeth',
+               3, 'TR', '1420', '1535']
+        _make_workbook_with_headers(self.path, headers, [row])
+        c = rio.read_registrar_xlsx(self.path)[0]
+        self.assertEqual(c['instructor'], 'Chacko, E')
+        self.assertEqual(c['instructor_last'], 'Chacko')
+        self.assertEqual(c['instructor_first'], 'Elizabeth')
+
+    def test_missing_instructor_columns_warns_and_staff(self):
+        headers = ['Subject Code', 'Course Number', 'Course',
+                   'Credits', 'Weekly Meeting Pattern', 'Begin Time HHMM', 'End Time HHMM']
+        row = ['GEOG', '1001', 'Intro to Human Geography', 3, 'TR', '1420', '1535']
+        _make_workbook_with_headers(self.path, headers, [row])
+        courses, warnings = rio.read_registrar_xlsx(self.path, return_warnings=True)
+        self.assertEqual(courses[0]['instructor'], 'Staff')
+        self.assertTrue(any('instructor' in w.lower() for w in warnings))
+
+    def test_staff_row_exports_blank_not_staff(self):
+        # An unassigned row reads as 'Staff' but must round-trip to blank, not 'Staff'.
+        _make_registrar_workbook(self.path, [_SCHEDULED, _STAFF_ROW])
+        courses = rio.read_registrar_xlsx(self.path)
+        staff = courses[1]
+        self.assertEqual(staff['instructor'], 'Staff')
+        self.assertEqual(staff['instructor_last'], '')
+        dst = os.path.join(self.tmp, 'out.xlsx')
+        rio.write_registrar_xlsx(courses, dst)
+        reread = rio.read_registrar_xlsx(dst)
+        self.assertEqual(reread[1]['instructor'], 'Staff')   # still Staff on re-read
+        # And the written Last Name cell is empty (not the literal 'Staff').
+        import openpyxl
+        ws = openpyxl.load_workbook(dst).active
+        last_name_col = rio.REGISTRAR_COLUMNS.index('Instructor Last Name') + 1
+        self.assertIn(ws.cell(row=3, column=last_name_col).value, (None, ''))
+
+
+class TestBytesIO(unittest.TestCase):
+    """Reading/writing via in-memory BytesIO (for the stateless web server)."""
+
+    def test_write_then_read_bytesio(self):
+        from io import BytesIO
+        # Build a source workbook in memory.
+        src = BytesIO()
+        _make_registrar_workbook(src, [_SCHEDULED, _SPECIAL_TOPIC, _TBA])
+        src.seek(0)
+        courses = rio.read_registrar_xlsx(src)
+        self.assertEqual(len(courses), 3)
+        # Write to a BytesIO and read it back — no disk involved.
+        out = BytesIO()
+        rio.write_registrar_xlsx(courses, out)
+        out.seek(0)
+        reread = rio.read_registrar_xlsx(out)
+        self.assertEqual([c['instructor'] for c in reread],
+                         [c['instructor'] for c in courses])
+
+
+# A genuinely unassigned ("Staff") row: empty GWID/last/first.
+_STAFF_ROW = [None, 'GEOG', '1002', 'Intro-Physical Geography', None,
+              None, None, None, 4, 100, 99, 0,
+              datetime(2027, 1, 11), datetime(2027, 4, 26), 'MW', '1110', '1225', None]
+
+
 if __name__ == '__main__':
     unittest.main()

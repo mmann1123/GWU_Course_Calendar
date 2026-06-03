@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GWU Course Calendar</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a73e8 0%, #0d47a1 100%);
+            min-height: 100vh; color: #202124; padding: 40px 20px;
+            display: flex; align-items: flex-start; justify-content: center;
+        }
+        .wrap { width: 100%; max-width: 760px; }
+        .header { text-align: center; color: #fff; margin-bottom: 32px; }
+        .header h1 { font-size: 32px; font-weight: 700; margin-bottom: 8px; }
+        .header p { font-size: 15px; opacity: 0.92; }
+        .cards { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        @media (max-width: 640px) { .cards { grid-template-columns: 1fr; } }
+        .card {
+            background: #fff; border-radius: 16px; padding: 28px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+        }
+        .card h2 { font-size: 19px; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+        .card .sub { font-size: 13px; color: #5f6368; margin-bottom: 20px; }
+        label { display: block; font-size: 13px; font-weight: 600; color: #3c4043; margin: 14px 0 6px; }
+        input, select {
+            width: 100%; padding: 11px 12px; font-size: 14px;
+            border: 1px solid #dadce0; border-radius: 10px; background: #fff;
+        }
+        input:focus, select:focus { outline: none; border-color: #1a73e8; box-shadow: 0 0 0 3px rgba(26,115,232,0.15); }
+        .btn {
+            width: 100%; margin-top: 22px; padding: 12px; font-size: 15px; font-weight: 600;
+            color: #fff; background: linear-gradient(135deg, #1a73e8 0%, #1557b0 100%);
+            border: none; border-radius: 10px; cursor: pointer; transition: transform 0.1s, box-shadow 0.2s;
+        }
+        .btn:hover { box-shadow: 0 4px 12px rgba(26,115,232,0.35); transform: translateY(-1px); }
+        .btn.green { background: linear-gradient(135deg, #34a853 0%, #0f9d58 100%); }
+        .btn.green:hover { box-shadow: 0 4px 12px rgba(52,168,83,0.35); }
+        .file-hint { font-size: 12px; color: #5f6368; margin-top: 10px; line-height: 1.5; }
+        .credits { text-align: center; color: #fff; margin-top: 30px; font-size: 13px; line-height: 1.7; }
+        .credits-main { font-weight: 500; }
+        .credits-sub { opacity: 0.82; font-size: 12px; margin-top: 4px; }
+        .credits a { color: #fff; text-decoration: underline; text-underline-offset: 2px; }
+        .credits a:hover { opacity: 0.85; }
+    </style>
+</head>
+<body>
+    <div class="wrap">
+        <div class="header">
+            <h1>🎓 GWU Course Calendar</h1>
+            <p>Build an interactive schedule calendar — scrape a subject live, or upload a registrar spreadsheet.</p>
+        </div>
+
+        <div class="cards">
+            <!-- Scrape by subject -->
+            <div class="card">
+                <h2>🔍 Scrape a subject</h2>
+                <div class="sub">Pull courses straight from GWU's schedule.</div>
+                <form action="/scrape" method="post">
+                    <label for="year">Year</label>
+                    <input type="number" id="year" name="year" value="2026" min="2000" max="2099" required>
+
+                    <label for="semester">Semester</label>
+                    <select id="semester" name="semester" required>
+                        {% for code, name in semesters.items() %}
+                        <option value="{{ code }}">{{ name }} {{ code }}</option>
+                        {% endfor %}
+                    </select>
+
+                    <label for="subject">Subject code</label>
+                    <input type="text" id="subject" name="subject" value="GEOG"
+                           placeholder="e.g. GEOG, CSCI, MATH" maxlength="5" required
+                           style="text-transform: uppercase;">
+
+                    <button class="btn" type="submit">Build calendar</button>
+                </form>
+            </div>
+
+            <!-- Upload registrar .xlsx -->
+            <div class="card">
+                <h2>📤 Upload registrar .xlsx</h2>
+                <div class="sub">Use the GWU registrar's schedule spreadsheet.</div>
+                <form action="/upload" method="post" enctype="multipart/form-data">
+                    <label for="file">Registrar schedule file</label>
+                    <input type="file" id="file" name="file" accept=".xlsx" required>
+                    <p class="file-hint">
+                        The G&amp;E Schedule "Export" format. Once loaded you can edit the
+                        schedule in the browser and export it back to .xlsx.
+                    </p>
+                    <button class="btn green" type="submit">Build calendar</button>
+                </form>
+            </div>
+        </div>
+
+        <footer class="credits">
+            <div class="credits-main">
+                Created by <a href="https://github.com/mmann1123" target="_blank" rel="noopener">Michael Mann</a> ·
+                <a href="https://geography.columbian.gwu.edu/" target="_blank" rel="noopener">Department of Geography &amp; Environment</a>,
+                The George Washington University
+            </div>
+            <div class="credits-sub">
+                Part of <a href="https://pygis.io" target="_blank" rel="noopener">pygis.io</a> ·
+                <a href="https://github.com/mmann1123/GWU_Course_Calendar" target="_blank" rel="noopener">Source on GitHub</a>
+            </div>
+        </footer>
+    </div>
+</body>
+</html>

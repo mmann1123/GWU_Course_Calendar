@@ -307,7 +307,9 @@ class ScraperGUI:
             self.log("="*70)
             self.log(f"\nFile: {path}\n")
 
-            courses = registrar_io.read_registrar_xlsx(path)
+            courses, warnings = registrar_io.read_registrar_xlsx(path, return_warnings=True)
+            for w in warnings:
+                self.log(f"⚠️  {w}")
             if not courses:
                 self.log("⚠️  No course rows found in the file.")
                 messagebox.showwarning("Import", "No course rows were found in that file.")
@@ -398,7 +400,7 @@ class ScraperGUI:
     def open_github_issues(self):
         """Open GitHub issues page in default browser"""
         import webbrowser
-        webbrowser.open('https://github.com/mmann1123/GWU_Course_Calendar/issues')
+        webbrowser.open('https://github.com/mmann1123/GWU_Course_Calendar/issues/new')
 
 
 def main():

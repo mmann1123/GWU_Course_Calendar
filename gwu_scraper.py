@@ -287,8 +287,17 @@ class CourseScraper:
         print(f"✓ Saved raw data to: {filename}")
 
 
-def generate_html_calendar(courses: List[Dict], output_file: str, year: str = None, semester: str = None):
-    """Generate interactive HTML calendar"""
+def build_html_calendar(courses: List[Dict], year: str = None, semester: str = None,
+                        web_export: bool = False) -> str:
+    """Build the interactive HTML calendar and return it as a string.
+
+    When ``web_export`` is True, a "📥 Export to Registrar (.xlsx)" button is added
+    to the edit toolbar that POSTs the live edited courses to the server's
+    ``/export/xlsx`` endpoint. This injection happens *after* the self-contained
+    ``EXPORT_TEMPLATE_B64`` blob is built, so the browser's offline "Export
+    Schedule" stays server-independent. With ``web_export`` False the placeholders
+    are stripped, producing output identical to the standalone/CLI calendar.
+    """
 
     courses_json = json.dumps(courses, ensure_ascii=False)
 
@@ -507,6 +516,7 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
     <nav class="rtd-navbar">
         <div class="rtd-navbar-content">
             <div class="rtd-navbar-left">
+                <!--WEB_BACK_BUTTON-->
                 <span class="rtd-navbar-title">🎓 GWU Course Calendar</span>
             </div>
             <div class="rtd-navbar-right">
@@ -516,7 +526,7 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
                     </svg>
                     GitHub
                 </a>
-                <a href="https://github.com/mmann1123/GWU_Course_Calendar/issues" target="_blank" class="rtd-nav-link">
+                <a href="https://github.com/mmann1123/GWU_Course_Calendar/issues/new" target="_blank" class="rtd-nav-link">
                     Report Issue
                 </a>
             </div>
@@ -703,6 +713,7 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
                 <button class="edit-action-btn btn-primary" onclick="exportSchedule()">
                     📦 Export Schedule
                 </button>
+                <!--WEB_EXPORT_BUTTON-->
             </div>
 
             <!-- Edit Mode Conflicts Section -->
@@ -760,8 +771,8 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
                             <input type="text" id="editCourseNum" required maxlength="10" placeholder="1001">
                         </div>
                         <div class="form-group">
-                            <label for="editSection">Section <span class="required">*</span></label>
-                            <input type="text" id="editSection" required maxlength="10" placeholder="10">
+                            <label for="editSection">Section</label>
+                            <input type="text" id="editSection" maxlength="10" placeholder="10">
                         </div>
                     </div>
 
@@ -971,6 +982,44 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
             }});
         }}
 
+        // Lay out a day's courses into non-overlapping columns (Google Calendar style).
+        // Courses that overlap in time share horizontal width instead of stacking on top
+        // of one another. Uses connected time-clusters + greedy column packing so a course
+        // that overlaps a *later* neighbour (but not the first one) still shares space.
+        function layoutDayCourses(coursesForDay) {{
+            const sorted = [...coursesForDay].sort((a, b) =>
+                timeToMinutes(a.time.start) - timeToMinutes(b.time.start));
+            const result = [];
+            let cluster = [];
+            let clusterMaxEnd = -1;
+            const flush = () => {{
+                if (!cluster.length) return;
+                const colEnds = [];   // last end-time (minutes) placed in each column
+                const cols = [];      // chosen column index per course in the cluster
+                cluster.forEach(c => {{
+                    const s = timeToMinutes(c.time.start);
+                    const e = timeToMinutes(c.time.end);
+                    let col = colEnds.findIndex(end => s >= end);
+                    if (col === -1) {{ col = colEnds.length; colEnds.push(e); }}
+                    else {{ colEnds[col] = e; }}
+                    cols.push(col);
+                }});
+                const numCols = colEnds.length;
+                cluster.forEach((c, i) => result.push({{course: c, column: cols[i], numCols}}));
+                cluster = [];
+                clusterMaxEnd = -1;
+            }};
+            sorted.forEach(c => {{
+                const s = timeToMinutes(c.time.start);
+                const e = timeToMinutes(c.time.end);
+                if (cluster.length && s >= clusterMaxEnd) flush();  // gap -> new cluster
+                cluster.push(c);
+                clusterMaxEnd = Math.max(clusterMaxEnd, e);
+            }});
+            flush();
+            return result;
+        }}
+
         function renderCourses() {{
             const startHour = 9;
             const pixelsPerMinute = 1;
@@ -987,38 +1036,12 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
             Object.keys(coursesByDay).forEach(dayId => {{
                 const dayColumn = document.getElementById(dayId);
                 const coursesForDay = coursesByDay[dayId];
-                coursesForDay.sort((a, b) => timeToMinutes(a.time.start) - timeToMinutes(b.time.start));
-                const processed = new Set();
-                coursesForDay.forEach((course, index) => {{
-                    if (processed.has(index)) return;
+                layoutDayCourses(coursesForDay).forEach(({{course, column, numCols}}) => {{
                     const startMinutes = timeToMinutes(course.time.start);
                     const endMinutes = timeToMinutes(course.time.end);
-                    const duration = endMinutes - startMinutes;
                     const topPosition = (startMinutes - (startHour * 60)) * pixelsPerMinute;
-                    const height = duration * pixelsPerMinute;
-                    const overlapping = [];
-                    for (let i = index + 1; i < coursesForDay.length; i++) {{
-                        if (processed.has(i)) continue;
-                        const other = coursesForDay[i];
-                        const otherStart = timeToMinutes(other.time.start);
-                        const otherEnd = timeToMinutes(other.time.end);
-                        if (startMinutes < otherEnd && endMinutes > otherStart) {{
-                            overlapping.push({{course: other, index: i}});
-                        }}
-                    }}
-                    const totalOverlapping = overlapping.length + 1;
-                    const widthPercent = 100 / totalOverlapping;
-                    renderCourseBlock(course, dayColumn, topPosition, height, 0, widthPercent);
-                    processed.add(index);
-                    overlapping.forEach((item, i) => {{
-                        const otherStartMinutes = timeToMinutes(item.course.time.start);
-                        const otherEndMinutes = timeToMinutes(item.course.time.end);
-                        const otherDuration = otherEndMinutes - otherStartMinutes;
-                        const otherTopPosition = (otherStartMinutes - (startHour * 60)) * pixelsPerMinute;
-                        const otherHeight = otherDuration * pixelsPerMinute;
-                        renderCourseBlock(item.course, dayColumn, otherTopPosition, otherHeight, i + 1, widthPercent);
-                        processed.add(item.index);
-                    }});
+                    const height = (endMinutes - startMinutes) * pixelsPerMinute;
+                    renderCourseBlock(course, dayColumn, topPosition, height, column, 100 / numCols);
                 }});
             }});
         }}
@@ -1241,42 +1264,12 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
             Object.keys(coursesByDay).forEach(dayId => {{
                 const dayColumn = document.getElementById(dayId);
                 const coursesForDay = coursesByDay[dayId];
-                coursesForDay.sort((a, b) => timeToMinutes(a.time.start) - timeToMinutes(b.time.start));
-                const processed = new Set();
-
-                coursesForDay.forEach((course, index) => {{
-                    if (processed.has(index)) return;
+                layoutDayCourses(coursesForDay).forEach(({{course, column, numCols}}) => {{
                     const startMinutes = timeToMinutes(course.time.start);
                     const endMinutes = timeToMinutes(course.time.end);
-                    const duration = endMinutes - startMinutes;
                     const topPosition = (startMinutes - (startHour * 60)) * pixelsPerMinute;
-                    const height = duration * pixelsPerMinute;
-                    const overlapping = [];
-
-                    for (let i = index + 1; i < coursesForDay.length; i++) {{
-                        if (processed.has(i)) continue;
-                        const other = coursesForDay[i];
-                        const otherStart = timeToMinutes(other.time.start);
-                        const otherEnd = timeToMinutes(other.time.end);
-                        if (startMinutes < otherEnd && endMinutes > otherStart) {{
-                            overlapping.push({{course: other, index: i}});
-                        }}
-                    }}
-
-                    const totalOverlapping = overlapping.length + 1;
-                    const widthPercent = 100 / totalOverlapping;
-                    renderCourseBlock(course, dayColumn, topPosition, height, 0, widthPercent);
-                    processed.add(index);
-
-                    overlapping.forEach((item, i) => {{
-                        const otherStartMinutes = timeToMinutes(item.course.time.start);
-                        const otherEndMinutes = timeToMinutes(item.course.time.end);
-                        const otherDuration = otherEndMinutes - otherStartMinutes;
-                        const otherTopPosition = (otherStartMinutes - (startHour * 60)) * pixelsPerMinute;
-                        const otherHeight = otherDuration * pixelsPerMinute;
-                        renderCourseBlock(item.course, dayColumn, otherTopPosition, otherHeight, i + 1, widthPercent);
-                        processed.add(item.index);
-                    }});
+                    const height = (endMinutes - startMinutes) * pixelsPerMinute;
+                    renderCourseBlock(course, dayColumn, topPosition, height, column, 100 / numCols);
                 }});
             }});
         }}
@@ -2040,79 +2033,12 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
                 const dayColumn = document.getElementById(`edit-${{dayName}}`);
                 const coursesForDay = coursesByDay[dayName];
 
-                // Debug: Log all courses for Tuesday to see what's being grouped
-                if (dayName === 'tuesday') {{
-                    console.log('=== DEBUG TUESDAY COURSES (BEFORE SORT) ===');
-                    console.log('Total courses on Tuesday:', coursesForDay.length);
-                    coursesForDay.forEach((c, idx) => {{
-                        const mins = timeToMinutes(c.time.start);
-                        console.log(`[${{idx}}] CRN ${{c.crn}}: ${{c.time.start}} - ${{c.time.end}} (start=${{mins}} mins) | ${{c.course_number}} ${{c.title}}`);
-                    }});
-                }}
-
-                // Sort by start time
-                coursesForDay.sort((a, b) => timeToMinutes(a.time.start) - timeToMinutes(b.time.start));
-
-                // Debug: Log after sorting
-                if (dayName === 'tuesday') {{
-                    console.log('=== DEBUG TUESDAY COURSES (AFTER SORT) ===');
-                    coursesForDay.forEach((c, idx) => {{
-                        const mins = timeToMinutes(c.time.start);
-                        console.log(`[${{idx}}] CRN ${{c.crn}}: ${{c.time.start}} - ${{c.time.end}} (start=${{mins}} mins) | ${{c.course_number}} ${{c.title}}`);
-                    }});
-                }}
-
-                const processed = new Set();
-
-                coursesForDay.forEach((course, index) => {{
-                    if (processed.has(index)) return;
-
+                layoutDayCourses(coursesForDay).forEach(({{course, column, numCols}}) => {{
                     const startMinutes = timeToMinutes(course.time.start);
                     const endMinutes = timeToMinutes(course.time.end);
-                    const duration = endMinutes - startMinutes;
                     const topPosition = (startMinutes - (startHour * 60)) * pixelsPerMinute;
-                    const height = duration * pixelsPerMinute;
-
-                    // Debug log for ALL courses on Tuesday to see positioning
-                    if (dayName === 'tuesday') {{
-                        console.log(`=== RENDER CRN ${{course.crn}} ===`);
-                        console.log('  time.start:', course.time.start, '→', startMinutes, 'minutes');
-                        console.log('  time.end:', course.time.end, '→', endMinutes, 'minutes');
-                        console.log('  duration:', duration, 'minutes');
-                        console.log('  topPosition:', topPosition, 'px');
-                        console.log('  height:', height, 'px');
-                    }}
-
-                    // Find overlapping courses
-                    const overlapping = [];
-                    for (let i = index + 1; i < coursesForDay.length; i++) {{
-                        if (processed.has(i)) continue;
-                        const other = coursesForDay[i];
-                        const otherStart = timeToMinutes(other.time.start);
-                        const otherEnd = timeToMinutes(other.time.end);
-                        if (startMinutes < otherEnd && endMinutes > otherStart) {{
-                            overlapping.push({{course: other, index: i}});
-                        }}
-                    }}
-
-                    // Calculate widths and positions
-                    const totalOverlapping = overlapping.length + 1;
-                    const widthPercent = 100 / totalOverlapping;
-
-                    // Render main course
-                    renderEditCourseBlock(course, dayColumn, topPosition, height, 0, widthPercent);
-                    processed.add(index);
-
-                    // Render overlapping courses
-                    overlapping.forEach((item, i) => {{
-                        const otherStartMinutes = timeToMinutes(item.course.time.start);
-                        const otherEndMinutes = timeToMinutes(item.course.time.end);
-                        const otherDuration = otherEndMinutes - otherStartMinutes;
-                        const otherTopPosition = (otherStartMinutes - (startHour * 60)) * pixelsPerMinute;
-                        const otherHeight = otherDuration * pixelsPerMinute;
-                        renderEditCourseBlock(item.course, dayColumn, otherTopPosition, otherHeight, i + 1, widthPercent);
-                        processed.add(item.index);
-                    }});
+                    const height = (endMinutes - startMinutes) * pixelsPerMinute;
+                    renderEditCourseBlock(course, dayColumn, topPosition, height, column, 100 / numCols);
                 }});
             }});
         }}
@@ -2121,11 +2047,6 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
         function renderEditCourseBlock(course, dayColumn, topPosition, height, column, widthPercent) {{
             const block = document.createElement('div');
             block.className = 'course-block';
-
-            // Debug Tuesday renders
-            if (dayColumn.id === 'edit-tuesday' && course.time.start === '11:00AM') {{
-                console.log(`  → renderEditCourseBlock CRN ${{course.crn}}: top=${{topPosition}}px, left=${{(column * widthPercent).toFixed(1)}}%, width=${{widthPercent.toFixed(1)}}%, column=${{column}}`);
-            }}
 
             // Mark edited courses
             if (editedCRNs.has(course.crn)) {{
@@ -2439,15 +2360,20 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
             // Get form data
             const newCRN = document.getElementById('editCRNInput').value;
             const originalCRN = document.getElementById('originalCRN').value;
+            const editIndex = originalCRN ? editedCourses.findIndex(c => c.crn === originalCRN) : -1;
+            const original = editIndex !== -1 ? editedCourses[editIndex] : {{}};
+            const instructorValue = document.getElementById('editInstructor').value;
 
-            const courseData = {{
+            // Start from the original course so registrar-only fields (full first
+            // name, GWID, enrollment, comment, dates, section title) survive an edit.
+            const courseData = Object.assign({{}}, original, {{
                 crn: newCRN,
                 subject: document.getElementById('editSubject').value,
                 course_num: document.getElementById('editCourseNum').value,
                 section: document.getElementById('editSection').value,
                 title: document.getElementById('editTitle').value,
                 credits: document.getElementById('editCredits').value,
-                instructor: document.getElementById('editInstructor').value,
+                instructor: instructorValue,
                 days: selectedDays,
                 time: {{
                     start: startTime,
@@ -2458,15 +2384,21 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
                 room: document.getElementById('editRoom').value || 'Not specified',
                 dates: document.getElementById('editDates').value || '01/12/26 - 04/27/26',
                 course_number: `${{document.getElementById('editSubject').value}} ${{document.getElementById('editCourseNum').value}}`,
-                status: 'OPEN'
-            }};
+                status: original.status || 'OPEN'
+            }});
+
+            // If the instructor was changed, re-derive last/first from the typed
+            // "Last, F" value (a full first name the user removed can't be recovered).
+            if (instructorValue !== (original.instructor || '')) {{
+                const parts = instructorValue.split(',');
+                courseData.instructor_last = (parts[0] || '').trim();
+                courseData.instructor_first = (parts[1] || '').trim();
+            }}
 
             // Update or add course
             if (originalCRN) {{
-                // Editing existing course
-                const index = editedCourses.findIndex(c => c.crn === originalCRN);
-                if (index !== -1) {{
-                    editedCourses[index] = courseData;
+                if (editIndex !== -1) {{
+                    editedCourses[editIndex] = courseData;
                     editedCRNs.add(newCRN);
                     if (originalCRN !== newCRN) {{
                         editedCRNs.delete(originalCRN);
@@ -2481,7 +2413,7 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
             editCount++;
             updateEditCount();
             populateEditInstructorFilter();
-            populateEditRoomFilter();
+            populateEditRoomDropdown();
             renderEditCalendar();
             displayEditModeConflicts();
             populateInstructorDatalist();
@@ -2505,7 +2437,7 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
                 editCount++;
                 updateEditCount();
                 populateEditInstructorFilter();
-                populateEditRoomFilter();
+                populateEditRoomDropdown();
                 renderEditCalendar();
                 displayEditModeConflicts();
                 closeEditModal();
@@ -2538,7 +2470,7 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
             editCount++;
             updateEditCount();
             populateEditInstructorFilter();
-            populateEditRoomFilter();
+            populateEditRoomDropdown();
             renderEditCalendar();
             displayEditModeConflicts();
             closeEditModal();
@@ -2881,6 +2813,8 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
             }}, 3000);
         }}
 
+        //WEB_EXPORT_SCRIPT
+
         // ============================================================================
         // END EDIT MODE FUNCTIONS
         // ============================================================================
@@ -2909,7 +2843,7 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
                     </svg>
                     View on GitHub
                 </a>
-                <a href="https://github.com/mmann1123/GWU_Course_Calendar/issues" target="_blank" class="rtd-footer-link">
+                <a href="https://github.com/mmann1123/GWU_Course_Calendar/issues/new" target="_blank" class="rtd-footer-link">
                     <svg class="github-icon" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
                         <path fill="currentColor" d="M8 1.5a6.5 6.5 0 100 13 6.5 6.5 0 000-13zM0 8a8 8 0 1116 0A8 8 0 010 8zm9 3a1 1 0 11-2 0 1 1 0 012 0zM6.92 6.085c.081-.16.19-.299.34-.398.145-.097.371-.187.74-.187.28 0 .553.087.738.225A.613.613 0 019 6.25c0 .177-.04.264-.077.318a.956.956 0 01-.277.245c-.076.051-.158.1-.258.161l-.007.004a7.728 7.728 0 00-.313.195 2.416 2.416 0 00-.692.661.75.75 0 001.248.832.956.956 0 01.276-.245 6.3 6.3 0 01.26-.16l.006-.004c.093-.057.204-.123.313-.195.222-.149.487-.355.692-.662.214-.32.329-.702.329-1.15 0-.76-.36-1.348-.863-1.725A2.76 2.76 0 008 4c-.631 0-1.155.16-1.572.438-.413.276-.68.638-.849.977a.75.75 0 001.342.67z"/>
                     </svg>
@@ -2918,8 +2852,11 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
             </div>
         </div>
         <div class="rtd-footer-attribution">
-            Credit: Michael Mann, Dept of Geography & Environment<br>
-            Scraped on {datetime.now().strftime("%B %d, %Y at %I:%M %p")} | Built with Python & BeautifulSoup
+            Created by <a href="https://github.com/mmann1123" target="_blank" rel="noopener" style="color:#8ab4f8;">Michael Mann</a> ·
+            <a href="https://geography.columbian.gwu.edu/" target="_blank" rel="noopener" style="color:#8ab4f8;">Department of Geography &amp; Environment</a>,
+            The George Washington University ·
+            Part of <a href="https://pygis.io" target="_blank" rel="noopener" style="color:#8ab4f8;">pygis.io</a><br>
+            Generated {datetime.now().strftime("%B %d, %Y at %I:%M %p")} | Built with Python &amp; BeautifulSoup
         </div>
     </footer>
 </body>
@@ -2939,10 +2876,79 @@ def generate_html_calendar(courses: List[Dict], output_file: str, year: str = No
         template_constant + 'const courses = '
     )
 
-    with open(output_file, 'w', encoding='utf-8') as f:
-        f.write(html_template)
+    # Optionally inject the server-side "Export to Registrar (.xlsx)" button + JS.
+    # Done AFTER the base64 embed above, so the offline export blob never carries
+    # a server dependency. When web_export is False, the placeholders are stripped.
+    if web_export:
+        back_button_html = (
+            '<a href="/" class="rtd-nav-link" title="Start over"'
+            ' style="margin-right:18px; border:1px solid rgba(255,255,255,0.45);'
+            ' padding:4px 12px; border-radius:6px;">&larr; New calendar</a>'
+        )
+        button_html = (
+            '<button class="edit-action-btn btn-primary" '
+            'onclick="exportToRegistrarServer()">📥 Export to Registrar (.xlsx)</button>'
+        )
+        script_js = '''
+        // Export the live edited schedule to the server, which returns a
+        // registrar-format .xlsx (stateless: built in memory, streamed back).
+        function exportToRegistrarServer() {
+            fetch('/export/xlsx', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(editedCourses)
+            })
+            .then(r => { if (!r.ok) throw new Error('Export failed (' + r.status + ')'); return r.blob(); })
+            .then(blob => downloadFile(blob, 'registrar_export.xlsx',
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'))
+            .then(() => showToast('📥 Registrar .xlsx downloaded', 'success'))
+            .catch(err => showToast('❌ ' + err.message, 'error'));
+        }
+'''
+    else:
+        back_button_html = ''
+        button_html = ''
+        script_js = ''
+    html_template = html_template.replace('<!--WEB_BACK_BUTTON-->', back_button_html)
+    html_template = html_template.replace('<!--WEB_EXPORT_BUTTON-->', button_html)
+    html_template = html_template.replace('//WEB_EXPORT_SCRIPT', script_js)
 
+    return html_template
+
+
+def generate_html_calendar(courses: List[Dict], output_file: str, year: str = None, semester: str = None):
+    """Generate the interactive HTML calendar and write it to ``output_file``."""
+    html = build_html_calendar(courses, year=year, semester=semester, web_export=False)
+    with open(output_file, 'w', encoding='utf-8') as f:
+        f.write(html)
     print(f"✓ Calendar saved to: {output_file}")
+
+
+# GWU semester code -> month digits used in termId (YYYYMM).
+GWU_SEMESTER_CODES = {'01', '02', '03'}
+
+
+def build_gwu_url(year, semester, subject) -> str:
+    """Construct (and validate) the GWU course-schedule URL.
+
+    This is the ONLY place the target host is set, so callers never pass a raw
+    URL — eliminating SSRF when invoked from the web layer. Raises ValueError on
+    invalid input. ``semester`` is the termId month code: 01=Spring, 02=Summer,
+    03=Fall.
+    """
+    year = str(year).strip()
+    semester = str(semester).strip()
+    subject = str(subject).strip().upper()
+
+    if not (year.isdigit() and len(year) == 4 and 2000 <= int(year) <= 2099):
+        raise ValueError(f"Invalid year: {year!r} (expected 4-digit year 2000-2099)")
+    if semester not in GWU_SEMESTER_CODES:
+        raise ValueError(f"Invalid semester code: {semester!r} (expected 01, 02, or 03)")
+    if not re.fullmatch(r'[A-Z]{2,5}', subject):
+        raise ValueError(f"Invalid subject code: {subject!r} (expected 2-5 letters)")
+
+    return (f"https://my.gwu.edu/mod/pws/courses.cfm"
+            f"?campId=1&termId={year}{semester}&subjId={subject}")
 
 
 def main():
@@ -2973,7 +2979,9 @@ def main():
         if args.xlsx_in:
             import registrar_io
             print(f"Reading registrar file: {args.xlsx_in}\n")
-            courses = registrar_io.read_registrar_xlsx(args.xlsx_in)
+            courses, warnings = registrar_io.read_registrar_xlsx(args.xlsx_in, return_warnings=True)
+            for w in warnings:
+                print(f"⚠️  {w}")
             timed = sum(1 for c in courses if c.get('time'))
             print(f"✓ Read {len(courses)} courses "
                   f"({timed} scheduled, {len(courses) - timed} arranged/TBA)")

@@ -11,3 +11,7 @@ __pycache__/
 # Allow docs folder for GitHub Pages
 !docs/
 !docs/**
+
+# Allow the Flask web app templates (not build artifacts)
+!templates/
+!templates/**

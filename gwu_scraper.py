@@ -2491,7 +2491,7 @@ def build_html_calendar(courses: List[Dict], year: str = None, semester: str = N
             editCount++;
             updateEditCount();
             populateEditInstructorFilter();
-            populateEditRoomFilter();
+            populateEditRoomDropdown();
             renderEditCalendar();
             displayEditModeConflicts();
             populateInstructorDatalist();
@@ -2515,7 +2515,7 @@ def build_html_calendar(courses: List[Dict], year: str = None, semester: str = N
                 editCount++;
                 updateEditCount();
                 populateEditInstructorFilter();
-                populateEditRoomFilter();
+                populateEditRoomDropdown();
                 renderEditCalendar();
                 displayEditModeConflicts();
                 closeEditModal();
@@ -2548,7 +2548,7 @@ def build_html_calendar(courses: List[Dict], year: str = None, semester: str = N
             editCount++;
             updateEditCount();
             populateEditInstructorFilter();
-            populateEditRoomFilter();
+            populateEditRoomDropdown();
             renderEditCalendar();
             displayEditModeConflicts();
             closeEditModal();

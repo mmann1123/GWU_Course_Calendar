@@ -1,5 +1,5 @@
 # GWU Course Calendar Scraper
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.22677063.svg)](https://doi.org/10.5281/zenodo.22677063)
+<a href="https://doi.org/10.5281/zenodo.22677063"><img src="https://zenodo.org/badge/DOI/10.5281/zenodo.22677063.svg" alt="DOI"></a>
 
 An easy-to-use application that creates a beautiful Google Calendar-style view of GWU course schedules.
 

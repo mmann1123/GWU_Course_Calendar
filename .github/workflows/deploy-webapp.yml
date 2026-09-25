@@ -1,0 +1,81 @@
+name: Test and Deploy Web App
+
+# Pull requests into main: run the tests.
+# Merges (pushes) to main: run the tests, then deploy to Cloud Run if they pass.
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  PROJECT_ID: haiti-fews-mmann1123
+  REGION: us-east1
+  SERVICE: gwu-course-calendar
+  IMAGE: us-east1-docker.pkg.dev/haiti-fews-mmann1123/cloud-run-source-deploy/gwu-course-calendar
+  # Keyless Google auth via Workload Identity Federation. The pool, provider and
+  # service account must be created once in Google Cloud before deploys work.
+  WIF_PROVIDER: projects/33790149295/locations/global/workloadIdentityPools/github/providers/github-oidc
+  DEPLOY_SA: gwu-calendar-deployer@haiti-fews-mmann1123.iam.gserviceaccount.com
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'   # matches the Dockerfile
+          cache: pip
+
+      # Node runs the calendar's own edit-mode JavaScript in tests/test_edit_export.py.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run tests
+        run: python -m unittest discover -s tests -v
+
+  deploy:
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write   # lets the job request a GitHub OIDC token for Google auth
+    concurrency:
+      group: deploy-${{ github.ref }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ env.WIF_PROVIDER }}
+          service_account: ${{ env.DEPLOY_SA }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Build and push image
+        run: |
+          gcloud auth configure-docker us-east1-docker.pkg.dev --quiet
+          docker build -t "$IMAGE:$GITHUB_SHA" .
+          docker push "$IMAGE:$GITHUB_SHA"
+
+      - id: deploy
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: ${{ env.SERVICE }}
+          region: ${{ env.REGION }}
+          image: ${{ env.IMAGE }}:${{ github.sha }}
+
+      - name: Smoke test
+        run: curl -fsS --retry 3 --retry-delay 5 "${{ steps.deploy.outputs.url }}/health"

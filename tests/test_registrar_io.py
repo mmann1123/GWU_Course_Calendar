@@ -131,6 +131,11 @@ class TestStatusAndDates(unittest.TestCase):
         self.assertEqual(rio._to_datetime('01/11/2027'), datetime(2027, 1, 11))
         self.assertEqual(rio._to_datetime('01/11/27'), datetime(2027, 1, 11))
 
+    def test_to_datetime_parses_stored_iso_with_time(self):
+        # Imported courses store dates via datetime.isoformat().
+        self.assertEqual(rio._to_datetime('2027-01-11T00:00:00'), datetime(2027, 1, 11))
+        self.assertIsNone(rio._to_datetime('not a date'))
+
     def test_to_datetime_passthrough_and_none(self):
         dt = datetime(2027, 4, 26)
         self.assertEqual(rio._to_datetime(dt), dt)

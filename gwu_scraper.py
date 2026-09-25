@@ -2276,6 +2276,10 @@ def build_html_calendar(courses: List[Dict], year: str = None, semester: str = N
             currentEditCRN = null;
             document.getElementById('editModalTitle').textContent = 'Add New Course';
             document.getElementById('editCourseForm').reset();
+            // reset() leaves hidden inputs alone; clear them so saving adds a new
+            // course instead of overwriting the last course that was opened.
+            document.getElementById('originalCRN').value = '';
+            document.getElementById('editCRN').value = '';
             document.getElementById('deleteCourseBtn').style.display = 'none';
             document.getElementById('duplicateCourseBtn').style.display = 'none';
 
@@ -2397,6 +2401,31 @@ def build_html_calendar(courses: List[Dict], year: str = None, semester: str = N
                 const parts = instructorValue.split(',');
                 courseData.instructor_last = (parts[0] || '').trim();
                 courseData.instructor_first = (parts[1] || '').trim();
+                // The GWID identified the previous instructor; don't carry it over.
+                courseData.gwid = '';
+            }}
+
+            // If the title was changed on a special-topics section, re-split the
+            // "Course - Section Title" display value so the export matches the edit.
+            const oldSectionTitle = original.section_title || '';
+            if (oldSectionTitle && courseData.title !== (original.title || '')) {{
+                const oldSuffix = ` - ${{oldSectionTitle}}`;
+                const oldBase = (original.title || '').endsWith(oldSuffix)
+                    ? original.title.slice(0, -oldSuffix.length) : (original.title || '');
+                if (courseData.title.endsWith(oldSuffix)) {{
+                    // Course name renamed, subtitle kept: nothing to change.
+                }} else if (oldBase && courseData.title.startsWith(`${{oldBase}} - `)) {{
+                    courseData.section_title = courseData.title.slice(oldBase.length + 3).trim();
+                }} else {{
+                    // Subtitle removed or whole title rewritten.
+                    courseData.section_title = '';
+                }}
+            }}
+
+            // Edited dates replace the preserved registrar dates on export.
+            if (courseData.dates !== (original.dates || '')) {{
+                delete courseData.course_start_date;
+                delete courseData.course_end_date;
             }}
 
             // Update or add course

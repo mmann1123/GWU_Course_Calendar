@@ -144,7 +144,12 @@ def _to_datetime(value) -> Optional[datetime]:
     if isinstance(value, datetime):
         return value
     s = str(value).strip()
-    for fmt in ('%Y-%m-%d', '%m/%d/%Y', '%m/%d/%y'):
+    try:
+        # ISO strings as stored on imported courses, e.g. '2027-01-11T00:00:00'.
+        return datetime.fromisoformat(s)
+    except ValueError:
+        pass
+    for fmt in ('%m/%d/%Y', '%m/%d/%y'):
         try:
             return datetime.strptime(s, fmt)
         except ValueError:

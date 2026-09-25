@@ -288,7 +288,7 @@ class CourseScraper:
 
 
 def build_html_calendar(courses: List[Dict], year: str = None, semester: str = None,
-                        web_export: bool = False) -> str:
+                        web_export: bool = False, analytics_html: str = '') -> str:
     """Build the interactive HTML calendar and return it as a string.
 
     When ``web_export`` is True, a "📥 Export to Registrar (.xlsx)" button is added
@@ -297,6 +297,10 @@ def build_html_calendar(courses: List[Dict], year: str = None, semester: str = N
     ``EXPORT_TEMPLATE_B64`` blob is built, so the browser's offline "Export
     Schedule" stays server-independent. With ``web_export`` False the placeholders
     are stripped, producing output identical to the standalone/CLI calendar.
+
+    ``analytics_html`` (web mode only) is raw markup inserted at the top of
+    ``<head>``, e.g. a Google Analytics tag. It is likewise excluded from the
+    offline export blob.
     """
 
     courses_json = json.dumps(courses, ensure_ascii=False)
@@ -2909,6 +2913,10 @@ def build_html_calendar(courses: List[Dict], year: str = None, semester: str = N
         back_button_html = ''
         button_html = ''
         script_js = ''
+    # Web-only analytics tag (e.g. GA4). Inserted after the base64 embed above so
+    # the downloadable offline calendar never includes it.
+    if web_export and analytics_html:
+        html_template = html_template.replace('<head>', '<head>\n' + analytics_html, 1)
     html_template = html_template.replace('<!--WEB_BACK_BUTTON-->', back_button_html)
     html_template = html_template.replace('<!--WEB_EXPORT_BUTTON-->', button_html)
     html_template = html_template.replace('//WEB_EXPORT_SCRIPT', script_js)

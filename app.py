@@ -15,6 +15,7 @@ Routes:
     GET  /healthz       health check for Cloud Run
 """
 
+import os
 from io import BytesIO
 
 from flask import (Flask, Response, render_template, request, send_file,
@@ -27,8 +28,16 @@ app = Flask(__name__)
 # Cap request bodies (covers both .xlsx uploads and the export JSON payload).
 app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024  # 10 MB
 MAX_EXPORT_COURSES = 5000
+# GA4 Measurement ID for courses.pygis.io. Override with the GA_MEASUREMENT_ID
+# env var; set it to an empty string to disable tracking (e.g. local dev).
+app.config['GA_MEASUREMENT_ID'] = os.environ.get('GA_MEASUREMENT_ID', 'G-BD4W32R0TM')
 
 SEMESTER_LABELS = {'01': 'Spring', '02': 'Summer', '03': 'Fall'}
+
+
+@app.context_processor
+def _inject_analytics():
+    return {'ga_measurement_id': app.config.get('GA_MEASUREMENT_ID', '')}
 
 
 @app.after_request
@@ -40,7 +49,9 @@ def _security_headers(resp):
 def _calendar_response(courses, year=None, semester=None):
     """Build the interactive calendar HTML (web mode) and return it as a response."""
     timed = [c for c in courses if c.get('time')]
-    html = build_html_calendar(timed, year=year, semester=semester, web_export=True)
+    analytics_html = render_template('_analytics.html')
+    html = build_html_calendar(timed, year=year, semester=semester, web_export=True,
+                               analytics_html=analytics_html)
     return Response(html, mimetype='text/html')
 
 
@@ -127,5 +138,4 @@ def health():
 
 if __name__ == '__main__':
     # Local dev only; production uses gunicorn (see Dockerfile).
-    import os
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 8080)), debug=True)

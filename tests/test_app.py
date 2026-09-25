@@ -93,5 +93,62 @@ class TestRoutes(unittest.TestCase):
         self.assertEqual(r.headers.get('X-Content-Type-Options'), 'nosniff')
 
 
+class TestAnalytics(unittest.TestCase):
+    """The GA4 tag is rendered on every server page and can be disabled via env."""
+
+    def setUp(self):
+        self.client = app.test_client()
+
+    def test_default_id_on_index(self):
+        app.config['GA_MEASUREMENT_ID'] = 'G-BD4W32R0TM'
+        r = self.client.get('/')
+        self.assertIn(b'googletagmanager.com/gtag/js?id=G-BD4W32R0TM', r.data)
+        self.assertIn(b"gtag('config', 'G-BD4W32R0TM')", r.data)
+
+    def test_tag_on_error_page(self):
+        app.config['GA_MEASUREMENT_ID'] = 'G-BD4W32R0TM'
+        r = self.client.post('/upload', data={
+            'file': (io.BytesIO(b'not a spreadsheet'), 'notes.txt')},
+            content_type='multipart/form-data')
+        self.assertEqual(r.status_code, 400)
+        self.assertIn(b'gtag/js?id=G-BD4W32R0TM', r.data)
+
+    def test_tag_on_calendar_page_but_not_in_offline_export(self):
+        app.config['GA_MEASUREMENT_ID'] = 'G-BD4W32R0TM'
+        r = self.client.post('/upload', data={
+            'file': (io.BytesIO(_registrar_xlsx_bytes()), 'sched.xlsx')},
+            content_type='multipart/form-data')
+        self.assertEqual(r.status_code, 200)
+        self.assertIn(b'gtag/js?id=G-BD4W32R0TM', r.data)
+        # The embedded offline template (downloaded "Export Schedule") must not
+        # carry the tag: decode the base64 blob and check.
+        import base64, re
+        m = re.search(rb'const EXPORT_TEMPLATE_B64 = "([^"]+)"', r.data)
+        self.assertIsNotNone(m)
+        offline = base64.b64decode(m.group(1))
+        self.assertNotIn(b'googletagmanager', offline)
+
+    def test_empty_id_disables_tag(self):
+        app.config['GA_MEASUREMENT_ID'] = ''
+        try:
+            self.assertNotIn(b'googletagmanager', self.client.get('/').data)
+            r = self.client.post('/upload', data={
+                'file': (io.BytesIO(_registrar_xlsx_bytes()), 'sched.xlsx')},
+                content_type='multipart/form-data')
+            self.assertNotIn(b'googletagmanager', r.data)
+        finally:
+            app.config['GA_MEASUREMENT_ID'] = 'G-BD4W32R0TM'
+
+    def test_env_var_overrides_default(self):
+        import importlib, app as app_module
+        os.environ['GA_MEASUREMENT_ID'] = 'G-TESTOVERRIDE'
+        try:
+            importlib.reload(app_module)
+            self.assertEqual(app_module.app.config['GA_MEASUREMENT_ID'], 'G-TESTOVERRIDE')
+        finally:
+            del os.environ['GA_MEASUREMENT_ID']
+            importlib.reload(app_module)
+
+
 if __name__ == '__main__':
     unittest.main()
